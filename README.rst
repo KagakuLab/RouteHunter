@@ -33,8 +33,6 @@ Installation
 Usage
 -----
 
-Train:
-
 .. code-block:: python
 
     pass
