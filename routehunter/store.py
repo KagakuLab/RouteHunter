@@ -86,14 +86,14 @@ class RouteHunterStore:
             contributor = p.contributor or "(unspecified)"
             contributor_counts[contributor] = contributor_counts.get(contributor, 0) + 1
 
-        n_multi_route_targets = sum(1 for t in targets if t.n_routes > 1)
+        n_multi_paper_targets = sum(1 for t in targets if t.n_routes > 1)
         n_cached_casp_routes = sum(len(v) for v in self._casp_routes.values())
 
         return {
             "n_targets": len(targets),
             "n_papers": len(papers),
-            "n_multi_route_targets": n_multi_route_targets,
+            "n_multi_paper_targets": n_multi_paper_targets,
             "n_cached_casp_routes": n_cached_casp_routes,
-            "papers_by_journal": journal_counts,
-            "papers_by_contributor": contributor_counts,
+            "targets_by_journal": journal_counts,
+            "targets_by_contributor": contributor_counts,
         }

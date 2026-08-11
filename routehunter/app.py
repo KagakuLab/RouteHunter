@@ -8,7 +8,7 @@ normal entry point for a session. It expects the layout:
     rh_data/core/routehunter_casp.csv        -- static AZ/SP/... solved-by-tool table (optional)
     rh_data/model/az_model.pickle            -- AiZynthFinder solvability model (optional)
     rh_data/model/sp_model.pickle            -- SynPlanner solvability model (optional)
-    rh_data/monitor/papers_<year>.csv        -- pre-scored papers for that year (optional, per year)
+    rh_data/monitor/paper_route_prob.csv     -- pre-scored papers, all years (optional)
 
 Nothing else changes the dataset afterward -- to add/correct data,
 retrain a property model, or refresh a year's Monitor file, do that
@@ -27,7 +27,7 @@ import pandas as pd
 from .store import RouteHunterStore
 from .intro import introduction as _introduction
 from .search import search as _search, SearchResult
-from .monitor import load_year as _load_monitor_year, MonitorResult
+from .monitor import load as _load_monitor, MonitorResult
 from .predict import predict as _predict, PredictResult
 from .seed import load_csv_seed as _load_csv_seed, SeedLoadReport
 from .properties import PropertyPredictorSet
@@ -65,9 +65,9 @@ class RouteHunterApp:
         from rh_data/<csv_subpath>, the static CASP-solved table from
         rh_data/<casp_table_subpath> (if present), any az_model.pickle
         / sp_model.pickle found under rh_data/<model_subdir>/, and
-        remembers rh_data/<monitor_subdir>/ for on-demand per-year
-        lookups via app.monitor(year). Everything except the seed CSV
-        is optional and skipped silently if missing.
+        remembers rh_data/<monitor_subdir>/ for on-demand lookups via
+        app.monitor(year=...). Everything except the seed CSV is
+        optional and skipped silently if missing.
         """
         base = Path(rh_data_dir)
         store = RouteHunterStore()
@@ -77,6 +77,16 @@ class RouteHunterApp:
 
         app = cls(store, property_predictors=predictors, monitor_dir=str(base / monitor_subdir))
         app.load_report = report  # kept for inspection, e.g. app.load_report.summary()
+        return app
+
+    @classmethod
+    def from_csv(cls, csv_path: str, column_map: Optional[dict] = None) -> "RouteHunterApp":
+        """CSV-only entry point, no property models, no Monitor data.
+        Useful for quick testing or if the rest isn't ready yet."""
+        store = RouteHunterStore()
+        report = _load_csv_seed(store, csv_path, column_map)
+        app = cls(store)
+        app.load_report = report
         return app
 
     # 1) Introduction --------------------------------------------------
@@ -92,16 +102,19 @@ class RouteHunterApp:
 
     # 3) Monitor -------------------------------------------------------------
     # Fully static/read-only: route probabilities were computed offline
-    # and written to rh_data/monitor/papers_<year>.csv. This just reads
-    # and sorts that file -- no classifier runs in the app itself.
+    # and written to rh_data/monitor/paper_route_prob.csv. This just
+    # reads, optionally filters by year, and sorts that file -- no
+    # classifier runs in the app itself.
 
-    def monitor(self, year: int) -> MonitorResult:
+    def monitor(self, year: Optional[int] = None) -> MonitorResult:
+        """year=None (default) returns the whole table; pass a year
+        to filter to papers published in that year."""
         if self.monitor_dir is None:
             return MonitorResult(
                 year=year, available=False, entries=[],
                 message="No monitor directory configured for this app.",
             )
-        return _load_monitor_year(self.monitor_dir, year)
+        return _load_monitor(self.monitor_dir, year=year)
 
     # 4) Predict --------------------------------------------------------------
     # No CASP engine is actually run here -- just the same solvability

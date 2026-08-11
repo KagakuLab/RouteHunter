@@ -29,7 +29,7 @@ TOOL_DISPLAY_NAMES: dict[str, str] = {
 
 # No real per-route link is stored yet -- just a placeholder pointing
 # the person at the tool itself.
-LINK_PLACEHOLDER = "please use this tool"
+LINK_PLACEHOLDER = "Cached predicted routes are not available yet"
 
 
 @dataclass
