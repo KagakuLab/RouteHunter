@@ -1,5 +1,15 @@
+"""
+RouteHunter — Streamlit app
+
+Sidebar-navigated demo covering Review, Search, Monitor, and Predict.
+Nothing here reimplements any logic — every section only calls into
+the existing routehunter package, same as RouteHunterApp.ipynb does.
+
+Run locally with:
+    streamlit run streamlit/streamlit_app.py
+"""
+
 import html
-import os.path
 from pathlib import Path
 
 import pandas as pd
@@ -9,55 +19,37 @@ from routehunter import RouteHunterApp
 from routehunter.app import DEFAULT_CSV_SUBPATH
 from routehunter.core import InvalidSMILESError
 
+# --- Example molecules, taken straight from RouteHunterApp.ipynb ---
+EXAMPLE_FOUND = "C(O)(C(O)=O)C(C1C=CC=CC=1)NC(C1C=CC=CC=1)=O"
+EXAMPLE_NOT_FOUND = "CC(C)Cc1ccc(cc1)C(C)C(=O)O"
 
-# Global settings
+# Change this if your data directory lives somewhere else relative to
+# wherever you run `streamlit run` from (see RouteHunterApp docs).
 DATA_DIR = "rh-data"
-SECTIONS = ["📊 Review", "🔎 Search", "📄️ Monitor", "💻 Predict", "💾 Download", "⬇️ Contribute"]
 
-# Sidebar settings
-SIDEBAR_WIDTH_PX = 220
-SIDEBAR_CSS = f"""
+SECTIONS = ["Review", "Search", "Monitor", "Predict"]
+
+# - Bumps the sidebar nav text up a size and bolds it (st.radio's own
+#   formatting only supports inline markdown, not font-size, hence the
+#   CSS override).
+# - Hides the sidebar's collapse control so it can't be closed. Two
+#   selectors are targeted because Streamlit renamed this element in
+#   1.38 (old: collapsedControl, new: stSidebarCollapseButton) --
+#   hiding both keeps this working across versions.
+# All of this is tied to Streamlit's current DOM structure -- if a
+# future version changes it, these selectors may need adjusting.
+SIDEBAR_CSS = """
 <style>
-section[data-testid="stSidebar"] div[role="radiogroup"] label p {{
+section[data-testid="stSidebar"] div[role="radiogroup"] label p {
     font-size: 1.15rem;
-}}
+}
 div[data-testid="collapsedControl"],
-div[data-testid="stSidebarCollapseButton"] {{
+div[data-testid="stSidebarCollapseButton"] {
     display: none;
-}}
-section[data-testid="stSidebar"] {{
-    min-width: {SIDEBAR_WIDTH_PX}px;
-    max-width: {SIDEBAR_WIDTH_PX}px;
-}}
+}
 </style>
 """
 
-# Metrics font size
-st.markdown(
-    """
-    <style>
-    [data-testid="stMetricLabel"] p {
-        font-size: 1.0rem;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-# Header space size
-st.markdown(
-    """
-    <style>
-    .block-container,
-    .stAppViewBlockContainer,
-    .stMainBlockContainer,
-    section.stMain .block-container {
-        padding-top: 2rem;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
 
 @st.cache_resource(show_spinner="Loading RouteHunter dataset...")
 def load_app(data_dir: str) -> RouteHunterApp:
@@ -75,12 +67,6 @@ def load_seed_csv(data_dir: str) -> pd.DataFrame:
     no pass through RouteHunterStore/Target parsing."""
     return pd.read_csv(Path(data_dir) / DEFAULT_CSV_SUBPATH)
 
-
-def caption(text: str, size: str = "1.1rem", color: str = "#000000") -> None:
-    st.caption(
-        f'<span style="font-size:{size}; color:{color};">{text}</span>',
-        unsafe_allow_html=True,
-    )
 
 def render_stat_list(counts: dict, empty_message: str) -> None:
     """
@@ -106,53 +92,67 @@ def render_stat_list(counts: dict, empty_message: str) -> None:
 
 
 def smiles_input(key: str) -> str:
-    return st.text_input("SMILES", key=key)
+    return st.text_input(
+        "SMILES",
+        key=key,
+        placeholder=EXAMPLE_FOUND,
+        help=f"Try a known molecule, e.g. `{EXAMPLE_FOUND}`, "
+        f"or an absent one, e.g. `{EXAMPLE_NOT_FOUND}`.",
+    )
 
 
 # --- Sections --------------------------------------------------------
 
 def render_review(app: RouteHunterApp) -> None:
     st.title("📊 Review")
-    st.write("RouteHunter dataset introduction")
-    st.divider()
+    st.caption(
+        "Dataset overview — the same numbers as RouteHunterApp.ipynb's "
+        "Review section, plus a preview of the raw seed CSV."
+    )
 
-    # render database stats
     stats = app.store.stats()
-    c1, c2, c3, c4, c5 = st.columns(5)
+
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("Targets", stats["n_targets"])
     c2.metric("Papers", stats["n_papers"])
-    c3.metric("Targets with >1 paper", stats["n_multi_paper_targets"])
-    c4.metric("Targets with predicted routes", stats["n_cached_casp_routes"])
-    c5.metric("Targets predicted for digitalization", stats["n_predicted_targets"])
-    st.divider()
+    c3.metric("Targets w/ >1 route", stats["n_multi_paper_targets"])
+    c4.metric(
+        "Cached CASP routes",
+        stats["n_cached_casp_routes"],
+        help="Session-only — never written back to the CSV.",
+    )
 
-    # render journals and contributors
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.subheader("Targets by journal")
-        render_stat_list(stats["targets_by_journal"], "No journal data available")
-    with col_b:
-        st.subheader("Targets by contributor")
-        render_stat_list(stats["targets_by_contributor"], "No contributor data available")
-
-    # dataset preview
     st.write("")
-    st.subheader("Dataset preview")
-    st.write("RouteHunter dataset file preview")
+    col_a, col_b = st.columns(2)
 
-    # load dataset
-    seed_df = load_seed_csv(DATA_DIR)
-    seed_df = seed_df[["title", "doi", "target"]]
-    seed_df.index = seed_df.index + 1
-    st.dataframe(seed_df, use_container_width=True, hide_index=False)
+    with col_a:
+        st.subheader("Papers by journal")
+        render_stat_list(stats["papers_by_journal"], "No journal data available.")
+
+    with col_b:
+        st.subheader("Papers by contributor")
+        render_stat_list(stats["papers_by_contributor"], "No contributor data available.")
+
+    st.divider()
+    st.subheader("Seed dataset preview")
+    st.caption(f"Raw, unprocessed contents of `{DATA_DIR}/{DEFAULT_CSV_SUBPATH}`.")
+    try:
+        seed_df = load_seed_csv(DATA_DIR)
+    except FileNotFoundError:
+        st.error(f"Could not find the seed CSV at `{DATA_DIR}/{DEFAULT_CSV_SUBPATH}`.")
+    else:
+        st.caption(f"{len(seed_df):,} rows × {len(seed_df.columns)} columns")
+        st.dataframe(seed_df, use_container_width=True, hide_index=True)
 
 
 def render_search(app: RouteHunterApp) -> None:
     st.title("🔎 Search")
-    st.write("Give a SMILES, get literature papers reporting the route for this molecule")
+    st.caption(
+        "Give a SMILES, get literature papers and/or CASP-predicted routes for it"
+    )
 
-    # process smiles
     smiles = smiles_input("search_smiles")
+
     if st.button("Search", type="primary"):
         if not smiles.strip():
             st.warning("Enter a SMILES string first.")
@@ -163,40 +163,37 @@ def render_search(app: RouteHunterApp) -> None:
             st.error(f"Couldn't parse that SMILES: {e}")
             return
 
-        # positive search results
-        if result.found:
-            if result.papers:
-                st.subheader(f"📄 Found {len(result.papers)} paper(s) with route for this molecule")
-                st.dataframe(
-                    [
-                        {
-                            "Journal": p.journal,
-                            "Title": p.title,
-                            "Year": p.year,
-                            "DOI": p.doi,
-                        }
-                        for p in result.papers
-                    ],
-                    use_container_width=True,
-                    hide_index=True,
-                )
-            st.subheader(f"💻 Found {len(result.casp_solved)} tool(s) with prediction for this molecule")
-            if result.casp_solved:
-                st.dataframe(
-                    [
-                        {"Tool": e.tool_display, "Result": f"Solved by {e.tool_display}", "Link": e.link}
-                        for e in result.casp_solved
-                    ],
-                    use_container_width=True,
-                    hide_index=True,
-                )
-            else:
-                st.info("No predictions were obtained by CASP tools for this molecule")
+        if result.papers:
+            st.subheader(f"📄 {len(result.papers)} paper(s) found")
+            st.dataframe(
+                [
+                    {
+                        "Title": p.title,
+                        "Journal": p.journal,
+                        "Year": p.year,
+                        "DOI": p.doi,
+                    }
+                    for p in result.papers
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
 
-        # negative search result
+        st.subheader("🤖 Cached CASP-predicted routes")
+        if result.casp_solved:
+            st.dataframe(
+                [
+                    {"Tool": e.tool_display, "Result": "Solved", "Link": e.link}
+                    for e in result.casp_solved
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("Cached predicted routes are not available yet.")
+
         if not result.found:
-            st.subheader("📄 Found 0 paper(s) with route for this molecule")
-            st.info("No papers with route were found for this molecule. You can try CASP tools for prediction:")
+            st.info("This molecule was not found in the dataset. Predicted solvability:")
             cols = st.columns(len(result.properties) or 1)
             for col, (name, value) in zip(cols, result.properties.items()):
                 col.metric(
@@ -204,50 +201,49 @@ def render_search(app: RouteHunterApp) -> None:
                     f"{value:.0%}" if value is not None else "n/a",
                 )
 
+        with st.expander("Raw report() text (same as the notebook)"):
+            st.code(result.report(), language="text")
+
 
 def render_monitor(app: RouteHunterApp) -> None:
-    st.title("📄️ Monitor")
-    st.write("Browse recent papers, pre-scored by predicted route probability. ")
+    st.title("🗞️ Monitor")
+    st.caption(
+        "Browse recent papers, pre-scored by predicted route probability. "
+        "Display-only — nothing here is written into the dataset."
+    )
 
-    # search by year range
-    col1, col2 = st.columns(2)
-    with col1:
-        year_min = st.number_input("From year", min_value=1832, max_value=2100, value=2025, step=1)
-    with col2:
-        year_max = st.number_input("To year", min_value=1832, max_value=2100, value=2025, step=1)
+    year = st.number_input("Year", min_value=1900, max_value=2100, value=2025, step=1)
 
     if st.button("Load", type="primary"):
-        if year_min > year_max:
-            st.error("'From year' can't be later than 'To year'.")
-            return
+        result = app.monitor(int(year))
 
-        result = app.monitor(year_min=int(year_min), year_max=int(year_max))
         if not result.available:
             st.info(result.message)
             return
 
         st.write(result.message)
-        monitor_df = result.to_dataframe()
-        monitor_df.index = monitor_df.index + 1
         st.dataframe(
-            monitor_df,
+            result.to_dataframe(),
             use_container_width=True,
-            hide_index=False,
+            hide_index=True,
             column_config={
-                "route_prob": st.column_config.TextColumn("Route report probability"),
+                "route_prob": st.column_config.TextColumn("Route probability"),
                 "journal": st.column_config.TextColumn("Journal"),
                 "title": st.column_config.TextColumn("Title", width="large"),
-                "publication_date": st.column_config.TextColumn("Publication date"),
                 "doi": st.column_config.TextColumn("DOI"),
             },
         )
 
 
 def render_predict(app: RouteHunterApp) -> None:
-    st.title("💻 Predict")
-    st.write("Predict solvability for a target with no known literature")
+    st.title("🧪 Predict")
+    st.caption(
+        "Predict solvability for a target with no known literature "
+        "synthesis, using the same models Search uses at level 1."
+    )
 
     smiles = smiles_input("predict_smiles")
+
     if st.button("Predict", type="primary"):
         if not smiles.strip():
             st.warning("Enter a SMILES string first.")
@@ -264,46 +260,10 @@ def render_predict(app: RouteHunterApp) -> None:
             hide_index=True,
             column_config={
                 "tool": st.column_config.TextColumn("Tool"),
-                "probability": st.column_config.TextColumn("Predicted chance to be solved"),
-                "url": st.column_config.LinkColumn("Link"),
+                "probability": st.column_config.TextColumn("Probability"),
+                "url": st.column_config.TextColumn("Link"),
             },
         )
-
-
-def render_download(app: RouteHunterApp) -> None:
-    st.title("💾 Download")
-    st.write("Export RouteHunter's underlying data files.")
-
-    # target dataset
-    st.subheader("Target collection")
-    st.write("Digitalized target collection")
-    file_path = Path(DATA_DIR) / "core/routehunter_seed.csv"
-    csv_data = file_path.read_bytes()
-    pdf_data = file_path.read_bytes()
-
-    col1, col2, _ = st.columns([1, 1, 8])
-    with col1:
-        st.download_button(label="Download CSV", data=csv_data, file_name="target_collection.csv", mime="text/csv")
-    with col2:
-        st.download_button(label="Download PDF", data=pdf_data, file_name="target_collection.pdf", mime="application/pdf")
-
-
-def render_contribute(app: RouteHunterApp) -> None:
-    st.title("⬇️ Contribute")
-    st.write(
-        "RouteHunter's dataset is static — there is no in-app way to add or "
-        "edit records. Contributions are reviewed and validated by an "
-        "administrator before being added to the seed CSV."
-    )
-
-    st.write(
-        "To submit a new record or correct an existing one, send your "
-        "request to [dvzankov@gmail.com](mailto:dvzankov@gmail.com). "
-        "Please include the name you'd like registered as the contributor "
-        "on your records — that's the name that will appear in the dataset "
-        "(see Review → \"Papers by contributor\")."
-    )
-
 
 
 # --- Page setup + sidebar navigation ---------------------------------
@@ -326,15 +286,11 @@ section = st.sidebar.radio(
     label_visibility="collapsed",
 )
 
-if section == "📊 Review":
+if section == "Review":
     render_review(app)
-elif section == "🔎 Search":
+elif section == "Search":
     render_search(app)
-elif section == "📄️ Monitor":
+elif section == "Monitor":
     render_monitor(app)
-elif section == "💻 Predict":
+elif section == "Predict":
     render_predict(app)
-elif section == "💾 Download":
-    render_download(app)
-elif section == "⬇️ Contribute":
-    render_contribute(app)
