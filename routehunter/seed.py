@@ -39,7 +39,7 @@ from .core import Target, PaperRecord, PaperSource, canonicalize, InvalidSMILESE
 from .store import RouteHunterStore
 
 DEFAULT_COLUMN_MAP = {
-    "smiles": "smiles",
+    "target": "target",
     "doi": "doi",
     "title": "title",
     "abstract": "abstract",
@@ -47,7 +47,7 @@ DEFAULT_COLUMN_MAP = {
     "year": "year",
     "contributor": "contributor",
 }
-REQUIRED_FIELDS = ("smiles", "doi", "title")
+REQUIRED_FIELDS = ("target", "doi", "title")
 
 
 @dataclass
@@ -121,7 +121,7 @@ def load_csv_seed(
                 continue
 
             try:
-                canon = canonicalize(values["smiles"])
+                canon = canonicalize(values["target"])
             except InvalidSMILESError as e:
                 report.errors.append(SeedLoadError(row_number, row, str(e)))
                 continue
@@ -138,7 +138,7 @@ def load_csv_seed(
                 target = Target(
                     inchikey=inchikey,
                     canonical_smiles=canon.canonical_smiles,
-                    input_smiles=values["smiles"],
+                    input_smiles=values["target"],
                 )
 
             if doi not in target.paper_dois:

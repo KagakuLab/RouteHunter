@@ -22,6 +22,3 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/KagakuLab/RouteHunter"
 Repository = "https://github.com/KagakuLab/RouteHunter"
-
-[tool.setuptools.packages.find]
-include = ["routehunter*"]

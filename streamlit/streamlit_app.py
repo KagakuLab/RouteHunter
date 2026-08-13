@@ -37,7 +37,7 @@ st.markdown(
     """
     <style>
     [data-testid="stMetricLabel"] p {
-        font-size: 1.1rem;
+        font-size: 1.0rem;
     }
     </style>
     """,
@@ -123,7 +123,8 @@ def render_review(app: RouteHunterApp) -> None:
     c2.metric("Papers", stats["n_papers"])
     c3.metric("Targets with >1 paper", stats["n_multi_paper_targets"])
     c4.metric("Targets with predicted routes", stats["n_cached_casp_routes"])
-    c5.metric("Targets predicted for digitalization", stats["n_cached_casp_routes"])
+    c5.metric("Targets predicted for digitalization", stats["n_predicted_targets"])
+    st.divider()
 
     # render journals and contributors
     col_a, col_b = st.columns(2)
@@ -141,7 +142,7 @@ def render_review(app: RouteHunterApp) -> None:
 
     # load dataset
     seed_df = load_seed_csv(DATA_DIR)
-    seed_df = seed_df[["title", "doi", "smiles"]]
+    seed_df = seed_df[["title", "doi", "target"]]
     seed_df.index = seed_df.index + 1
     st.dataframe(seed_df, use_container_width=True, hide_index=False)
 
@@ -208,15 +209,23 @@ def render_monitor(app: RouteHunterApp) -> None:
     st.title("📄️ Monitor")
     st.write("Browse recent papers, pre-scored by predicted route probability. ")
 
-    # search by year
-    year = st.number_input("Year", min_value=1832, max_value=2100, value=2025, step=1)
-    if st.button("Predict", type="primary"):
-        result = app.monitor(int(year))
+    # search by year range
+    col1, col2 = st.columns(2)
+    with col1:
+        year_min = st.number_input("From year", min_value=1832, max_value=2100, value=2025, step=1)
+    with col2:
+        year_max = st.number_input("To year", min_value=1832, max_value=2100, value=2025, step=1)
+
+    if st.button("Load", type="primary"):
+        if year_min > year_max:
+            st.error("'From year' can't be later than 'To year'.")
+            return
+
+        result = app.monitor(year_min=int(year_min), year_max=int(year_max))
         if not result.available:
             st.info(result.message)
             return
 
-        # display search result
         st.write(result.message)
         monitor_df = result.to_dataframe()
         monitor_df.index = monitor_df.index + 1
