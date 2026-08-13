@@ -1,27 +1,9 @@
-"""
-Monitor module (previously called Hunter/Browse).
-
-Fully static, read-only: predicted route probabilities for papers are
-computed OFFLINE, outside the app, using train_route_classifier.py
-against whatever paper source you choose, and written to
-rh_data/monitor/paper_route_prob.csv. The app never runs a classifier
-here -- it just reads that file, optionally filters it by year, sorts
-it, and returns it for display.
-
-Expected CSV columns: journal, title, abstract, doi, route_prob,
-publication_date. route_prob is already computed (0..1 float).
-publication_date is a date string (e.g. "2014-03-17"), parsed here and
-rendered for display as e.g. "March 17, 2014".
-"""
-
+import pandas as pd
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-import pandas as pd
-
-DEFAULT_MONITOR_FILENAME = "paper_route_prob.csv"
-
+DEFAULT_MONITOR_FILENAME = "paper_route_prob_high.csv"
 
 @dataclass
 class MonitorEntry:

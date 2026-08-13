@@ -1,20 +1,3 @@
-"""
-Storage layer for RouteHunter.
-
-The store is in-memory only and holds no independent persistence of
-its own. The app is static: the CSV loaded via seed.load_csv_seed is
-the single source of truth, and a fresh RouteHunterStore is built from
-it at the start of each session. There is no save()/load() to a
-separate database file -- if you want to change the dataset, edit the
-CSV and reload; there is no other write path.
-
-The one exception is the CASP prediction cache (_casp_routes): it is
-populated at runtime by casp.predict_route() purely to avoid
-recomputing a prediction within the same session, and is explicitly
-NOT part of the persistent dataset. It is never written back to the
-CSV and does not survive a session restart.
-"""
-
 from typing import Optional
 
 from .core import Target, PaperRecord, CASPRouteRecord
