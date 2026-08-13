@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 DEFAULT_MONITOR_FILENAME = "paper_route_prob_high.csv"
+DEFAULT_MEDIUM_FILENAME = "paper_route_prob_medium.csv"
 
 @dataclass
 class MonitorEntry:
@@ -16,8 +17,7 @@ class MonitorEntry:
 
     @property
     def formatted_date(self) -> str:
-        """e.g. 'March 17, 2014'. %-d / %e for a no-leading-zero day
-        aren't portable across platforms, so build it manually instead."""
+        """e.g. '17/03/2014'."""
         if self.publication_date is None or pd.isna(self.publication_date):
             return ""
         d = self.publication_date
@@ -26,14 +26,15 @@ class MonitorEntry:
 
 @dataclass
 class MonitorResult:
-    year: Optional[int]  # the filter that was applied, or None if unfiltered
+    year_min: Optional[int]  # the filter that was applied, or None if unfiltered
+    year_max: Optional[int]
     available: bool
     entries: list[MonitorEntry] = field(default_factory=list)
     message: str = ""
 
     def format_table(self, limit: Optional[int] = None) -> str:
         """Human-readable listing, sorted (already done at load time),
-        probabilities shown as e.g. '76%', dates shown as e.g. 'March 17, 2014'."""
+        probabilities shown as e.g. '76%', dates shown as e.g. '17/03/2014'."""
         if not self.available:
             return self.message
 
@@ -49,7 +50,7 @@ class MonitorResult:
         """
         Same data as format_table(), as a pandas DataFrame. route_prob
         is rendered as a percentage string (e.g. '76%') and
-        publication_date as e.g. 'March 17, 2014', matching the rest
+        publication_date as e.g. '17/03/2014', matching the rest
         of the app's display convention. Use `result.entries` instead
         if you want the raw float/Timestamp for further computation.
         """
@@ -73,17 +74,19 @@ class MonitorResult:
 
 def load(
     monitor_dir: str,
-    year: Optional[int] = None,
+    year_min: Optional[int] = None,
+    year_max: Optional[int] = None,
     filename: str = DEFAULT_MONITOR_FILENAME,
 ) -> MonitorResult:
     """
     Load rh_data/<monitor_subdir>/<filename> (one file covering all
-    years). If `year` is given, filters to rows whose publication_date
-    falls in that year; if omitted, returns the whole table. Either
-    way, results are sorted by route_prob descending.
+    years). year_min/year_max filter to rows whose publication_date
+    falls in that range (either or both may be omitted; omitting both
+    returns the whole table). Either way, results are sorted by
+    route_prob descending.
 
     If the file itself doesn't exist, returns available=False. If the
-    file exists but no rows match the given year, returns
+    file exists but no rows match the given range, returns
     available=True with an empty entries list -- those are different
     situations (no data at all vs. a filter that matched nothing).
     """
@@ -91,7 +94,8 @@ def load(
 
     if not path.exists():
         return MonitorResult(
-            year=year,
+            year_min=year_min,
+            year_max=year_max,
             available=False,
             entries=[],
             message="Monitor data is not available.",
@@ -99,15 +103,21 @@ def load(
 
     df = pd.read_csv(path, parse_dates=["publication_date"])
 
-    if year is not None:
-        df = df[df["publication_date"].dt.year == year]
-        if df.empty:
-            return MonitorResult(
-                year=year,
-                available=True,
-                entries=[],
-                message=f"No papers found for {year}.",
-            )
+    if year_min is not None:
+        df = df[df["publication_date"].dt.year >= year_min]
+    if year_max is not None:
+        df = df[df["publication_date"].dt.year <= year_max]
+
+    range_desc = _describe_range(year_min, year_max)
+
+    if df.empty and (year_min is not None or year_max is not None):
+        return MonitorResult(
+            year_min=year_min,
+            year_max=year_max,
+            available=True,
+            entries=[],
+            message=f"No papers found{range_desc}.",
+        )
 
     df = df.sort_values("route_prob", ascending=False)
 
@@ -123,10 +133,36 @@ def load(
         for _, row in df.iterrows()
     ]
 
-    suffix = f" for {year}" if year is not None else ""
     return MonitorResult(
-        year=year,
+        year_min=year_min,
+        year_max=year_max,
         available=True,
         entries=entries,
-        message=f"{len(entries)} paper(s){suffix}, sorted by predicted route probability.",
+        message=f"{len(entries)} paper(s){range_desc}, sorted by predicted route probability.",
     )
+
+
+def _describe_range(year_min: Optional[int], year_max: Optional[int]) -> str:
+    if year_min is not None and year_max is not None:
+        if year_min == year_max:
+            return f" for {year_min}"
+        return f" for {year_min}-{year_max}"
+    if year_min is not None:
+        return f" from {year_min} onward"
+    if year_max is not None:
+        return f" up to {year_max}"
+    return ""
+
+
+def count_predicted_targets(monitor_dir: str, filename: str = DEFAULT_MEDIUM_FILENAME) -> int:
+    """
+    Row count of the medium-confidence file (paper_route_prob_medium.csv
+    by default) -- lower-certainty candidates than the main
+    high-confidence Monitor file, used only as a count (targets
+    awaiting digitalization), not displayed as a browsable table.
+    Returns 0 if the file doesn't exist rather than raising.
+    """
+    path = Path(monitor_dir) / filename
+    if not path.exists():
+        return 0
+    return len(pd.read_csv(path))

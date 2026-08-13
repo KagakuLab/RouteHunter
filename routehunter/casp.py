@@ -1,19 +1,3 @@
-"""
-CASP table module.
-
-Loads the pre-computed static table (rh_data/core/routehunter_casp.csv
-by default -- columns: inchikey, SMILES, <tool_1>, <tool_2>, ...,
-produced offline via merge_tool_tables.py) recording, for each
-molecule, whether each CASP tool solved it.
-
-This is a plain lookup -- no engine runs here, no route steps are
-stored yet, just a boolean per tool. Distinct from casp.py, which
-wraps an actual CASP engine call at runtime and caches a full
-predicted Route. If/when real route data is stored per tool, this
-module is where the link placeholder below gets replaced with a real
-one.
-"""
-
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
