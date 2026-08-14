@@ -1,35 +1,3 @@
-"""
-Seed module.
-
-Loads the app's dataset from a CSV -- this is the ONLY way data enters
-RouteHunter. The app is static: there is no Contribute/admin pipeline,
-no in-app write path, no persistence layer separate from the CSV.
-Each CSV file represents one version of the dataset; to add or correct
-data, edit the CSV and reload.
-
-Rows are folded into the Target/PaperRecord graph: multiple rows for
-the same molecule (different papers) become independent routes on one
-Target; one paper appearing under multiple targets is linked to each;
-an exact repeat of a (molecule, paper) pair is folded in without being
-double-counted in the dataset (though it still counts toward the
-targets total in the load report, since it was still a row in the
-file).
-
-Expected CSV columns (case-insensitive), with sensible defaults but
-fully remappable via `column_map` if your file uses different names:
-
-    smiles      (required)  structure of the target
-    doi         (required)  paper identifier
-    title       (required)
-    abstract    (optional)
-    journal     (optional)
-    year        (optional)
-
-Rows with unparseable SMILES or missing required fields are recorded
-in the report's `errors` list (with the 1-indexed row number) rather
-than aborting the whole load.
-"""
-
 import csv
 from dataclasses import dataclass, field
 from pathlib import Path
