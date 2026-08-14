@@ -12,7 +12,7 @@ from routehunter.core import InvalidSMILESError
 
 # Global settings
 DATA_DIR = "rh-data"
-SECTIONS = ["📊 Review", "🔎 Search", "📄️ Monitor", "💻 Predict", "💾 Download", "⬇️ Contribute"]
+SECTIONS = ["📊 Review", "🔎 Search", "💻 Predict", "📄️ Monitor", "💾 Download", "⬇️ Contribute"]
 
 # Sidebar settings
 SIDEBAR_WIDTH_PX = 220
@@ -95,7 +95,7 @@ def render_stat_list(counts: dict, empty_message: str) -> None:
     rows = "".join(
         f"""
         <div style="display:flex; justify-content:space-between; align-items:baseline;
-                    padding:0.45rem 0; border-bottom:1px solid rgba(128,128,128,0.25);">
+                    padding:0.1rem 0; border-bottom:1px solid rgba(128,128,128,0.25);">
             <span style="font-size:0.95rem;">{html.escape(str(name))}</span>
             <span style="font-size:1.3rem; font-weight:600;">{count}</span>
         </div>
@@ -113,7 +113,14 @@ def smiles_input(key: str) -> str:
 
 def render_review(app: RouteHunterApp) -> None:
     st.title("📊 Review")
-    st.write("RouteHunter dataset introduction")
+    st.write("**RouteHunter** is a system for collecting and sharing reference data on multi-step synthesis routes. "
+             "Its current database contains **1,000+ digitized target molecules** (stored as SMILES), "
+             "each linked to the paper reporting a multi-step route to it. This dataset supports benchmarking "
+             "**computer-aided synthesis planning (CASP)** tools by how many targets they can solve, "
+             "and - for solved targets - comparing a tool's predicted route against the one published in the original paper. "
+             "Beyond the dataset itself, **RouteHunter** lets you **search for a molecule** to find whether a route to it has "
+             "already been **published or solved by a CASP tool**, **predict the molecule solvability** by open-source CASP tools, "
+             "and **monitor newly published papers** likely to report new routes.")
     st.divider()
 
     # render database stats
@@ -137,8 +144,9 @@ def render_review(app: RouteHunterApp) -> None:
 
     # dataset preview
     st.write("")
-    st.subheader("Dataset preview")
-    st.write("RouteHunter dataset file preview")
+    st.subheader("Target collection preview")
+    st.write("Each paper was checked to confirm it reports a detailed multi-step synthesis route; if so, the target "
+             "molecule was extracted and stored as its SMILES. A preview of the resulting dataset is shown below:")
 
     # load dataset
     seed_df = load_seed_csv(DATA_DIR)
@@ -149,7 +157,17 @@ def render_review(app: RouteHunterApp) -> None:
 
 def render_search(app: RouteHunterApp) -> None:
     st.title("🔎 Search")
-    st.write("Give a SMILES, get literature papers reporting the route for this molecule")
+    st.write(
+        "**Search service** lets you check whether a given target molecule already has a known route - "
+        "either a paper reporting it, or a CASP tool that has already predicted a route for it")
+    st.write(
+        "**Try examples for positive search results:**\n"
+        "- ``C#CCOC1=C(C=C(C(=C1)N2C(=O)N3CCCCC3=N2)Cl)Cl``\n"
+        "- ``C(O)(C(O)=O)C(C1C=CC=CC=1)NC(C1C=CC=CC=1)=O``\n"
+        "- ``C1CCC(=C(C1)CC(=O)O)N2C(=O)C=CC(=N2)C3=C4C=CC=CN4N=C3C5=CC=CC=C5``\n\n"
+        "**Try examples for a negative search result:**\n"
+        "- ``CC(C)Cc1ccc(cc1)C(C)C(=O)O``"
+    )
 
     # process smiles
     smiles = smiles_input("search_smiles")
@@ -197,17 +215,62 @@ def render_search(app: RouteHunterApp) -> None:
         if not result.found:
             st.subheader("📄 Found 0 paper(s) with route for this molecule")
             st.info("No papers with route were found for this molecule. You can try CASP tools for prediction:")
-            cols = st.columns(len(result.properties) or 1)
-            for col, (name, value) in zip(cols, result.properties.items()):
-                col.metric(
-                    f"Chance to be solved by {name}",
-                    f"{value:.0%}" if value is not None else "n/a",
+
+            try:
+                result = app.predict(smiles)
+                st.dataframe(
+                    result.to_dataframe(),
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "tool": st.column_config.TextColumn("Tool"),
+                        "probability": st.column_config.TextColumn("Predicted chance to be solved"),
+                        "url": st.column_config.LinkColumn("Link"),
+                    },
                 )
+            except InvalidSMILESError as e:
+                st.error(f"Couldn't parse that SMILES: {e}")
+                return
+
+
+def render_predict(app: RouteHunterApp) -> None:
+    st.title("💻 Predict")
+    st.write(
+        "**Predict service** can predict the solvability of a molecule - the chance that it can be solved by open-source CASP tools")
+    st.write(
+        "**Try these examples:**\n"
+        "- ``C#CCOC1=C(C=C(C(=C1)N2C(=O)N3CCCCC3=N2)Cl)Cl``\n"
+        "- ``C(O)(C(O)=O)C(C1C=CC=CC=1)NC(C1C=CC=CC=1)=O``\n"
+        "- ``CC(C)Cc1ccc(cc1)C(C)C(=O)O``")
+
+    smiles = smiles_input("predict_smiles")
+    if st.button("Predict", type="primary"):
+        if not smiles.strip():
+            st.warning("Enter a SMILES string first.")
+            return
+        try:
+            result = app.predict(smiles)
+        except InvalidSMILESError as e:
+            st.error(f"Couldn't parse that SMILES: {e}")
+            return
+
+        st.dataframe(
+            result.to_dataframe(),
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "tool": st.column_config.TextColumn("Tool"),
+                "probability": st.column_config.TextColumn("Predicted chance to be solved"),
+                "url": st.column_config.LinkColumn("Link"),
+            },
+        )
 
 
 def render_monitor(app: RouteHunterApp) -> None:
     st.title("📄️ Monitor")
-    st.write("Browse recent papers, pre-scored by predicted route probability. ")
+    st.write(
+        "**Monitor service** ranks papers by the predicted probability that they describe a multi-step synthesis route, "
+        "based only on the paper's title and abstract.")
 
     # search by year range
     col1, col2 = st.columns(2)
@@ -216,7 +279,7 @@ def render_monitor(app: RouteHunterApp) -> None:
     with col2:
         year_max = st.number_input("To year", min_value=1832, max_value=2100, value=2025, step=1)
 
-    if st.button("Load", type="primary"):
+    if st.button("Predict", type="primary"):
         if year_min > year_max:
             st.error("'From year' can't be later than 'To year'.")
             return
@@ -243,33 +306,6 @@ def render_monitor(app: RouteHunterApp) -> None:
         )
 
 
-def render_predict(app: RouteHunterApp) -> None:
-    st.title("💻 Predict")
-    st.write("Predict solvability for a target with no known literature")
-
-    smiles = smiles_input("predict_smiles")
-    if st.button("Predict", type="primary"):
-        if not smiles.strip():
-            st.warning("Enter a SMILES string first.")
-            return
-        try:
-            result = app.predict(smiles)
-        except InvalidSMILESError as e:
-            st.error(f"Couldn't parse that SMILES: {e}")
-            return
-
-        st.dataframe(
-            result.to_dataframe(),
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "tool": st.column_config.TextColumn("Tool"),
-                "probability": st.column_config.TextColumn("Predicted chance to be solved"),
-                "url": st.column_config.LinkColumn("Link"),
-            },
-        )
-
-
 def render_download(app: RouteHunterApp) -> None:
     st.title("💾 Download")
     st.write("Export RouteHunter's underlying data files.")
@@ -281,6 +317,11 @@ def render_download(app: RouteHunterApp) -> None:
     csv_data = file_path.read_bytes()
     pdf_data = file_path.read_bytes()
 
+    #
+    st.subheader("Route report prediction")
+    st.subheader("CASP solvability prediction")
+    st.subheader("Targets predicted for digitalization")
+
     col1, col2, _ = st.columns([1, 1, 8])
     with col1:
         st.download_button(label="Download CSV", data=csv_data, file_name="target_collection.csv", mime="text/csv")
@@ -291,19 +332,15 @@ def render_download(app: RouteHunterApp) -> None:
 def render_contribute(app: RouteHunterApp) -> None:
     st.title("⬇️ Contribute")
     st.write(
-        "RouteHunter's dataset is static — there is no in-app way to add or "
-        "edit records. Contributions are reviewed and validated by an "
-        "administrator before being added to the seed CSV."
-    )
-
+        "**RouteHunter** is a static application - for now, there's no way to add or edit any of its data files directly. "
+        "All data is updated manually by an administrator, after the submitted data has been validated. "
+        "Contributions of any kind are welcome - send them to dvzankov@gmail.com, and please include the name you'd like "
+        "registered as the contributor on your records.")
     st.write(
-        "To submit a new record or correct an existing one, send your "
-        "request to [dvzankov@gmail.com](mailto:dvzankov@gmail.com). "
-        "Please include the name you'd like registered as the contributor "
-        "on your records — that's the name that will appear in the dataset "
-        "(see Review → \"Papers by contributor\")."
-    )
-
+        "**For scientists:** propose new papers and their target molecules for the dataset, or flag targets with "
+        "no known route that you'd like tested against open-source CASP .")
+    st.write(
+        "**For developers:** propose having your CASP tool integrated into **RouteHunter**, for use in route search and solvability prediction.")
 
 
 # --- Page setup + sidebar navigation ---------------------------------
@@ -330,10 +367,10 @@ if section == "📊 Review":
     render_review(app)
 elif section == "🔎 Search":
     render_search(app)
-elif section == "📄️ Monitor":
-    render_monitor(app)
 elif section == "💻 Predict":
     render_predict(app)
+elif section == "📄️ Monitor":
+    render_monitor(app)
 elif section == "💾 Download":
     render_download(app)
 elif section == "⬇️ Contribute":

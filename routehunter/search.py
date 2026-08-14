@@ -1,36 +1,3 @@
-"""
-Search module.
-
-Two levels, in order:
-
-    1) Properties -- run every registered PropertyPredictor (see
-       properties.py) on the input SMILES: currently predicted
-       solvability by AiZynthFinder / SynPlanner, extensible to more.
-       Predictor names are already display-ready (e.g.
-       "AiZynthFinder", not an internal key needing translation), so
-       nothing downstream needs a separate name -> label mapping.
-       This runs regardless of whether the molecule is in the
-       dataset at all. It also doubles as the fallback shown when
-       nothing is found at level 2 (see below).
-
-    2) Structural lookup -- SMILES -> InChIKey -> for that molecule:
-           - literature papers
-           - cached CASP routes (an actual engine was run at runtime
-             via casp.py and its result cached for this session)
-           - static CASP-solved entries (rh_data/core/routehunter_casp.csv,
-             computed offline -- "this tool solved this molecule",
-             with a placeholder link until real route data is stored)
-
-`found` is True if ANY of papers / cached routes / solved-table
-entries exist. When none of them do, SearchResult.report() falls back
-to showing the level-1 property predictions as a "you could try these
-tools" section instead of an empty result.
-
-NOTE: level 2 does not do substructure or similarity search. If/when
-that is needed, add a fingerprint index alongside the inchikey index
-in RouteHunterStore rather than reworking this function's contract.
-"""
-
 from dataclasses import dataclass, field
 from typing import Optional
 

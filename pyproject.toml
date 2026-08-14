@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "routehunter"
-version = "0.1.0"
+version = "1.1.0"
 description = "A system for the collection and distribution of reference information on chemical synthesis routes"
 readme = "README.rst"
 license = { text = "MIT" }
