@@ -40,7 +40,6 @@ def train_route_model(
     y: np.ndarray,
     param_grid: Optional[dict] = None,
     random_state: int = 42,
-    test_size: float = 0.2,
     validation_fraction: float = 0.2,
 ) -> tuple[Pipeline, dict]:
     """Fits Pipeline(TfidfVectorizer -> LogisticRegression). See
@@ -54,9 +53,7 @@ def train_route_model(
 
     model, metrics = fit_and_evaluate(
         pipeline, grid, X, y,
-        scoring="balanced_accuracy",
-        stratify=True,
-        test_size=test_size,
+        scoring="f1_score",
         validation_fraction=validation_fraction,
         random_state=random_state,
     )
