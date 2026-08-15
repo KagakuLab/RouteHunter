@@ -1,16 +1,3 @@
-"""
-Predict module.
-
-No CASP engine is actually wired into the app yet -- there's nothing
-here that runs AiZynthFinder or SynPlanner itself. Instead: given a
-SMILES, run the same pre-trained solvability models used by Search's
-level-1 properties (see properties.py), and pair each tool's predicted
-probability with a link to that tool, so the person can go run it
-themselves on whichever target looks most promising.
-
-Reuses whatever PropertyPredictorSet the app already loaded (from
-rh_data/model/*.pickle) -- no separate model loading here.
-"""
 
 from dataclasses import dataclass, field
 from typing import Optional
@@ -19,10 +6,10 @@ import pandas as pd
 
 from .properties import PropertyPredictor
 
-# Maps a property predictor's name (now already the tool's display
-# name, e.g. "AiZynthFinder" -- see PropertyPredictorSet.load_from_dir)
-# to a link. Add an entry here for any future solvability model
-# alongside its own PropertyPredictor registration.
+# Maps a property predictor's name (the tool's display name, e.g.
+# "AiZynthFinder" -- see PropertyPredictorSet.load_from_config) to a
+# link. Add an entry here for any future solvability model alongside
+# its own PropertyPredictor registration.
 TOOL_LINKS: dict[str, str] = {
     "AiZynthFinder": "https://github.com/MolecularAI/aizynthfinder",
     "SynPlanner": "https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner",
@@ -38,7 +25,7 @@ class ToolPrediction:
 
 @dataclass
 class PredictResult:
-    smiles: str
+    input_value: str  # the SMILES or text that was actually predicted on
     predictions: list[ToolPrediction] = field(default_factory=list)
 
     def to_dataframe(self) -> pd.DataFrame:
@@ -54,7 +41,7 @@ class PredictResult:
         ])
 
 
-def predict(smiles: str, property_predictors: list[PropertyPredictor]) -> PredictResult:
+def predict_casp_solvability(smiles: str, property_predictors: list[PropertyPredictor]) -> PredictResult:
     """
     Run every registered solvability predictor on `smiles` and pair
     each result with its tool's link. A predictor that fails on this
@@ -70,4 +57,24 @@ def predict(smiles: str, property_predictors: list[PropertyPredictor]) -> Predic
             probability = None
         predictions.append(ToolPrediction(tool_name=predictor.name, probability=probability, url=url))
 
-    return PredictResult(smiles=smiles, predictions=predictions)
+    return PredictResult(input_value=smiles, predictions=predictions)
+
+
+def predict_route_probability(text: str, route_model) -> PredictResult:
+    """
+    Run the route classifier (abstract_model.pickle) on `text` --
+    already-combined title+abstract, see routehunter_build.models.
+    combine_text for the expected format. route_model=None (e.g. the
+    file wasn't present in config.csv) yields probability=None rather
+    than raising.
+    """
+    if route_model is None:
+        probability = None
+    else:
+        try:
+            probability = route_model.predict_proba([text])[0, 1]
+        except Exception:
+            probability = None
+
+    prediction = ToolPrediction(tool_name="Route classifier", probability=probability, url="")
+    return PredictResult(input_value=text, predictions=[prediction])

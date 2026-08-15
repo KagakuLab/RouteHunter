@@ -1,24 +1,11 @@
-"""
-Properties module.
-
-This is "level 1" of Search: before any structural (InChIKey) lookup
-happens, a set of registered PropertyPredictors run on the input
-SMILES and produce a dict of named properties -- currently the
-predicted probability of AiZynthFinder / SynPlanner finding a route,
-loaded from pre-trained pickled models (see train_solvability_model.py,
-a standalone script outside this package).
-
-Deliberately a small registry rather than hardcoded AZ/SP fields: add
-another PropertyPredictor (a different pickled model, a rule-based
-descriptor, whatever) and register it alongside the existing two, and
-every Search call picks it up automatically with no changes needed to
-search.py or SearchResult.
-"""
 
 import pickle
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Callable, Optional
+
+# Config.csv keys that are solvability models -- these are also each
+# model's display name, used directly in Search/Predict output.
+SOLVABILITY_MODEL_KEYS = ["AiZynthFinder", "SynPlanner"]
 
 
 @dataclass
@@ -31,11 +18,9 @@ class PropertyPredictor:
 def load_pickled_proba_predictor(pickle_path: str, name: str) -> PropertyPredictor:
     """
     Wrap a pickled sklearn-style model (anything exposing
-    predict_proba, e.g. the Pipelines produced by
-    train_solvability_model.py) as a PropertyPredictor. The pickle is
-    expected to be self-contained -- see that script's use of
-    cloudpickle -- so loading it here requires nothing beyond the
-    file itself.
+    predict_proba) as a PropertyPredictor. The pickle is expected to
+    be self-contained (see routehunter_build's use of cloudpickle),
+    so loading it here requires nothing beyond the file itself.
     """
     with open(pickle_path, "rb") as f:
         model = pickle.load(f)
@@ -65,25 +50,19 @@ def compute_properties(smiles: str, predictors: list[PropertyPredictor]) -> dict
 
 @dataclass
 class PropertyPredictorSet:
-    """Convenience bundle for the standard rh_data/model/ layout:
-
-        rh_data/model/az_model.pickle
-        rh_data/model/sp_model.pickle
-
-    Extend by adding more (path, name) pairs to `load_from_dir` below
-    as more predictors are trained.
-    """
     predictors: list[PropertyPredictor] = field(default_factory=list)
 
     @classmethod
-    def load_from_dir(cls, model_dir: str) -> "PropertyPredictorSet":
-        model_path = Path(model_dir)
+    def load_from_config(cls, config_paths: dict[str, str]) -> "PropertyPredictorSet":
+        """
+        config_paths is the dict returned by config.load_config().
+        Only the known solvability-model keys are loaded here; any
+        key missing from config.csv (model not trained yet) is
+        skipped silently.
+        """
         predictors = []
-        for filename, name in [
-            ("az_model.pickle", "AiZynthFinder"),
-            ("sp_model.pickle", "SynPlanner"),
-        ]:
-            path = model_path / filename
-            if path.exists():
-                predictors.append(load_pickled_proba_predictor(str(path), name))
+        for name in SOLVABILITY_MODEL_KEYS:
+            path = config_paths.get(name)
+            if path:
+                predictors.append(load_pickled_proba_predictor(path, name))
         return cls(predictors=predictors)

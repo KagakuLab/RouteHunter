@@ -3,9 +3,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-DEFAULT_MONITOR_FILENAME = "paper_route_prob_high.csv"
-DEFAULT_MEDIUM_FILENAME = "paper_route_prob_medium.csv"
-
 @dataclass
 class MonitorEntry:
     journal: Optional[str]
@@ -73,24 +70,24 @@ class MonitorResult:
 
 
 def load(
-    monitor_dir: str,
+    monitor_high_path: str,
     year_min: Optional[int] = None,
     year_max: Optional[int] = None,
-    filename: str = DEFAULT_MONITOR_FILENAME,
 ) -> MonitorResult:
     """
-    Load rh_data/<monitor_subdir>/<filename> (one file covering all
-    years). year_min/year_max filter to rows whose publication_date
-    falls in that range (either or both may be omitted; omitting both
-    returns the whole table). Either way, results are sorted by
-    route_prob descending.
+    Load the high-confidence Monitor file at an explicit path
+    (resolved from config.csv's monitor_high entry -- see config.py).
+    year_min/year_max filter to rows whose publication_date falls in
+    that range (either or both may be omitted; omitting both returns
+    the whole table). Either way, results are sorted by route_prob
+    descending.
 
     If the file itself doesn't exist, returns available=False. If the
     file exists but no rows match the given range, returns
     available=True with an empty entries list -- those are different
     situations (no data at all vs. a filter that matched nothing).
     """
-    path = Path(monitor_dir) / filename
+    path = Path(monitor_high_path)
 
     if not path.exists():
         return MonitorResult(
@@ -154,15 +151,16 @@ def _describe_range(year_min: Optional[int], year_max: Optional[int]) -> str:
     return ""
 
 
-def count_predicted_targets(monitor_dir: str, filename: str = DEFAULT_MEDIUM_FILENAME) -> int:
+def count_predicted_targets(monitor_medium_path: str) -> int:
     """
-    Row count of the medium-confidence file (paper_route_prob_medium.csv
-    by default) -- lower-certainty candidates than the main
-    high-confidence Monitor file, used only as a count (targets
-    awaiting digitalization), not displayed as a browsable table.
-    Returns 0 if the file doesn't exist rather than raising.
+    Row count of the medium-confidence Monitor file at an explicit
+    path (resolved from config.csv's monitor_medium entry) -- lower-
+    certainty candidates than the high-confidence file, used only as
+    a count (targets awaiting digitalization), not displayed as a
+    browsable table. Returns 0 if the file doesn't exist rather than
+    raising.
     """
-    path = Path(monitor_dir) / filename
+    path = Path(monitor_medium_path)
     if not path.exists():
         return 0
     return len(pd.read_csv(path))
