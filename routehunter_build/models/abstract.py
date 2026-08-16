@@ -21,7 +21,7 @@ def combine_text(title, abstract) -> str:
     return f"{title}. {abstract}" if abstract else title
 
 
-def load_route_data(
+def load_abstract_data(
     csv_path: str,
     title_col: str = "title",
     abstract_col: str = "abstract",
@@ -35,7 +35,7 @@ def load_route_data(
     return texts, y
 
 
-def train_route_model(
+def train_abstract_model(
     X: list[str],
     y: np.ndarray,
     param_grid: Optional[dict] = None,
@@ -53,7 +53,7 @@ def train_route_model(
 
     model, metrics = fit_and_evaluate(
         pipeline, grid, X, y,
-        scoring="f1_score",
+        scoring="f1",
         validation_fraction=validation_fraction,
         random_state=random_state,
     )
