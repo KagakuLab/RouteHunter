@@ -5,12 +5,13 @@ import pandas as pd
 import streamlit as st
 
 from routehunter import RouteHunterApp
+from routehunter.app import TargetStaticData, CandidateStaticData, AbstractTrainingData
 from routehunter.config import load_config
 from routehunter.core import InvalidSMILESError
 
 
 # Global settings
-DATA_DIR = "rh-data"
+DATA_DIR = "rh_data"
 SECTIONS = ["📊 Review", "🔎 Search", "💻 Predict", "📄️ Monitor", "💾 Download", "⬇️ Contribute"]
 
 # Sidebar settings
@@ -72,9 +73,9 @@ def load_app(data_dir: str) -> RouteHunterApp:
 def load_seed_csv(data_dir: str) -> pd.DataFrame:
     """Raw contents of the seed CSV, unprocessed -- straight pd.read_csv,
     no pass through RouteHunterStore/Target parsing. Path comes from
-    config.csv's "seed" entry -- there's no default path to fall back
-    to anymore."""
-    seed_path = load_config(data_dir)["seed"]
+    config.csv's TargetStaticData entry -- there's no default path to
+    fall back to anymore."""
+    seed_path = load_config(data_dir)[TargetStaticData]
     return pd.read_csv(seed_path)
 
 
@@ -132,7 +133,7 @@ def render_review(app: RouteHunterApp) -> None:
     c2.metric("Papers", stats["n_papers"])
     c3.metric("Targets with >1 paper", stats["n_multi_paper_targets"])
     c4.metric("Targets with predicted routes", stats["n_cached_casp_routes"])
-    c5.metric("Targets predicted for digitalization", stats["n_predicted_targets"])
+    c5.metric("Papers predicted for digitalization", stats["n_predicted_targets"])
     st.divider()
 
     # render journals and contributors
@@ -310,21 +311,28 @@ def render_monitor(app: RouteHunterApp) -> None:
 
 def render_download(app: RouteHunterApp) -> None:
     st.title("💾 Download")
-    st.write("Export RouteHunter's underlying data files.")
+    st.write("Here one can download RouteHunter underlying data files, each useful for a different purpose.")
 
-    # target dataset
-    st.subheader("Target collection")
-    st.write("Digitalized target collection")
-    file_path = Path(load_config(DATA_DIR)["seed"])
-    csv_data = file_path.read_bytes()
+    # 1. Target dataset
+    st.subheader("Digitalized target collection")
+    st.write("The full collection of digitized target molecules (stored as SMILES), each linked to its source paper. "
+             "Can be used for looking up literature routes for a given target, or for benchmarking CASP tools.")
+    file_path = Path(load_config(DATA_DIR)[TargetStaticData])
+    st.download_button(label="Download CSV", data=file_path.read_bytes(), file_name="target_collection.csv", mime="text/csv")
 
-    #
-    st.subheader("Route report prediction")
-    st.subheader("CASP solvability prediction")
-    st.subheader("Targets predicted for digitalization")
+    # 2. Candidate dataset
+    st.subheader("Candidate paper collection")
+    st.write("Papers predicted, but not yet manually confirmed, to report a synthesis route. "
+             "Can be used as a starting point for digitizing new targets.")
+    file_path = Path(load_config(DATA_DIR)[CandidateStaticData])
+    st.download_button(label="Download CSV", data=file_path.read_bytes(), file_name="candidate_collection.csv", mime="text/csv")
 
-    col1, col2, _ = st.columns([1, 1, 8])
-    st.download_button(label="Download CSV", data=csv_data, file_name="target_collection.csv", mime="text/csv")
+    # 3. Paper-with-route dataset
+    st.subheader("Paper-with-route training data")
+    st.write("Paper titles and abstracts, each labeled with whether that paper reports a synthesis route (1 - Yes / 0 - No). "
+             "Can be used for training a route report probability model from open metadata (paper title and abstract) alone.")
+    file_path = Path(load_config(DATA_DIR)[AbstractTrainingData])
+    st.download_button(label="Download CSV", data=file_path.read_bytes(), file_name="abstract_training_data.csv", mime="text/csv")
 
 
 def render_contribute(app: RouteHunterApp) -> None:

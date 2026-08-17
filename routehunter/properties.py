@@ -1,17 +1,3 @@
-"""
-Properties module.
-
-This is "level 1" of Search: before any structural (InChIKey) lookup
-happens, a set of registered PropertyPredictors run on the input
-SMILES and produce a dict of named properties -- currently the
-predicted probability of AiZynthFinder / SynPlanner finding a route.
-
-This module holds no knowledge of which tools exist -- that's
-app.py's TOOLS registry, the single source of truth for per-tool
-config keys and display names. load_from_config just takes whatever
-(model_key, display_name) pairs it's given.
-"""
-
 import pickle
 from dataclasses import dataclass, field
 from typing import Callable, Optional

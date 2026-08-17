@@ -167,9 +167,3 @@ class RouteHunterApp:
 
     def predict_route_probability(self, text: str) -> PredictResult:
         return _predict_route_probability(text, self.route_model)
-
-    # 5) Download ---------------------------------------------------------------
-
-    def download(self, **filters) -> pd.DataFrame:
-        from .download import download as _download
-        return _download(self.store, **filters)

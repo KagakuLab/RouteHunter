@@ -1,26 +1,3 @@
-"""
-Predict module.
-
-No CASP engine is actually wired into the app -- there's nothing here
-that runs AiZynthFinder or SynPlanner itself. Two separate
-predictions live here:
-
-    predict_casp_solvability(smiles) -- runs the same pre-trained
-    solvability models used by Search's level-1 properties (see
-    properties.py), pairing each tool's predicted probability with a
-    link to that tool.
-
-    predict_route_probability(text) -- runs the route classifier
-    directly. Not used by the GUI; exists for batch use via the
-    Python interface.
-
-Both return the same PredictResult shape for consistency, even though
-predict_route_probability only ever has one "tool" (the classifier
-itself, no link). This module holds no knowledge of which tools exist
-or where they link to -- that's app.py's TOOLS registry; the tool
-links are passed in per call.
-"""
-
 from dataclasses import dataclass, field
 from typing import Optional
 
