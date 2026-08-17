@@ -5,7 +5,7 @@ from typing import Callable, Optional
 
 # Config.csv keys that are solvability models -- these are also each
 # model's display name, used directly in Search/Predict output.
-SOLVABILITY_MODEL_KEYS = ["AiZynthFinder", "SynPlanner"]
+SOLVABILITY_MODEL_KEYS = ["aizynthfinder", "synplanner"]
 
 
 @dataclass
@@ -62,6 +62,7 @@ class PropertyPredictorSet:
         """
         predictors = []
         for name in SOLVABILITY_MODEL_KEYS:
+            print(name)
             path = config_paths.get(name)
             if path:
                 predictors.append(load_pickled_proba_predictor(path, name))

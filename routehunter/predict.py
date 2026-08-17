@@ -11,8 +11,8 @@ from .properties import PropertyPredictor
 # link. Add an entry here for any future solvability model alongside
 # its own PropertyPredictor registration.
 TOOL_LINKS: dict[str, str] = {
-    "AiZynthFinder": "https://github.com/MolecularAI/aizynthfinder",
-    "SynPlanner": "https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner",
+    "aizynthfinder": "https://github.com/MolecularAI/aizynthfinder",
+    "synplanner": "https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner",
 }
 
 
@@ -76,5 +76,5 @@ def predict_route_probability(text: str, route_model) -> PredictResult:
         except Exception:
             probability = None
 
-    prediction = ToolPrediction(tool_name="Route classifier", probability=probability, url="")
+    prediction = ToolPrediction(tool_name="Paper classifier", probability=probability, url="")
     return PredictResult(input_value=text, predictions=[prediction])

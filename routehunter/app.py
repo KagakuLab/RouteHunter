@@ -53,26 +53,23 @@ class RouteHunterApp:
         """
         paths = load_config(rh_data_dir)  # raises FileNotFoundError if config.csv itself is missing
 
-        if "seed_csv" not in paths:
-            raise KeyError("config.csv must include a 'seed_csv' entry -- the app has no dataset without it.")
-
         store = RouteHunterStore()
-        report = _load_csv_seed(store, paths["seed_csv"], column_map)
+        report = _load_csv_seed(store, paths["seed"], column_map)
 
-        if "casp_table" in paths:
-            store.set_casp_table(_load_casp_table(paths["casp_table"]))
+        if "casp" in paths:
+            store.set_casp_table(_load_casp_table(paths["casp"]))
 
-        if "monitor_medium" in paths:
-            store.set_n_predicted_targets(_count_predicted_targets(paths["monitor_medium"]))
+        if "candidate" in paths:
+            store.set_n_predicted_targets(_count_predicted_targets(paths["candidate"]))
 
         predictors = PropertyPredictorSet.load_from_config(paths)
 
-        route_model = _load_route_model(paths["abstract_model"]) if "abstract_model" in paths else None
+        route_model = _load_route_model(paths["paper"]) if "paper" in paths else None
 
         app = cls(
             store,
             property_predictors=predictors,
-            monitor_high_path=paths.get("monitor_high"),
+            monitor_high_path=paths.get("monitor"),
             route_model=route_model,
         )
         app.load_report = report  # kept for inspection, e.g. app.load_report.summary()
