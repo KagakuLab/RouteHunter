@@ -1,3 +1,25 @@
+"""
+Predict module.
+
+No CASP engine is actually wired into the app -- there's nothing here
+that runs AiZynthFinder or SynPlanner itself. Two separate
+predictions live here:
+
+    predict_casp_solvability(smiles) -- runs the same pre-trained
+    solvability models used by Search's level-1 properties (see
+    properties.py), pairing each tool's predicted probability with a
+    link to that tool.
+
+    predict_route_probability(text) -- runs the route classifier
+    directly. Not used by the GUI; exists for batch use via the
+    Python interface.
+
+Both return the same PredictResult shape for consistency, even though
+predict_route_probability only ever has one "tool" (the classifier
+itself, no link). This module holds no knowledge of which tools exist
+or where they link to -- that's app.py's TOOLS registry; the tool
+links are passed in per call.
+"""
 
 from dataclasses import dataclass, field
 from typing import Optional
@@ -5,15 +27,6 @@ from typing import Optional
 import pandas as pd
 
 from .properties import PropertyPredictor
-
-# Maps a property predictor's name (the tool's display name, e.g.
-# "AiZynthFinder" -- see PropertyPredictorSet.load_from_config) to a
-# link. Add an entry here for any future solvability model alongside
-# its own PropertyPredictor registration.
-TOOL_LINKS: dict[str, str] = {
-    "aizynthfinder": "https://github.com/MolecularAI/aizynthfinder",
-    "synplanner": "https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner",
-}
 
 
 @dataclass
@@ -41,16 +54,21 @@ class PredictResult:
         ])
 
 
-def predict_casp_solvability(smiles: str, property_predictors: list[PropertyPredictor]) -> PredictResult:
+def predict_casp_solvability(
+    smiles: str,
+    property_predictors: list[PropertyPredictor],
+    tool_links: dict[str, str],
+) -> PredictResult:
     """
     Run every registered solvability predictor on `smiles` and pair
-    each result with its tool's link. A predictor that fails on this
+    each result with its tool's link (tool_links: {display_name: url},
+    see app.py's TOOLS registry). A predictor that fails on this
     molecule yields probability=None for that tool rather than
     failing the whole call.
     """
     predictions = []
     for predictor in property_predictors:
-        url = TOOL_LINKS.get(predictor.name, "")
+        url = tool_links.get(predictor.name, "")
         try:
             probability = predictor.predict(smiles)
         except Exception:
@@ -62,11 +80,10 @@ def predict_casp_solvability(smiles: str, property_predictors: list[PropertyPred
 
 def predict_route_probability(text: str, route_model) -> PredictResult:
     """
-    Run the route classifier (abstract_model.pickle) on `text` --
-    already-combined title+abstract, see routehunter_build.models.
-    combine_text for the expected format. route_model=None (e.g. the
-    file wasn't present in config.csv) yields probability=None rather
-    than raising.
+    Run the route classifier on `text` -- already-combined
+    title+abstract, see routehunter_build.models.combine_text for the
+    expected format. route_model=None (e.g. the file wasn't present
+    in config.csv) yields probability=None rather than raising.
     """
     if route_model is None:
         probability = None

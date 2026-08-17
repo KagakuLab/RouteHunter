@@ -1,4 +1,5 @@
 import pickle
+from dataclasses import dataclass
 from typing import Optional
 import pandas as pd
 
@@ -17,6 +18,39 @@ from .casp import load_casp_table as _load_casp_table
 from .config import load_config
 
 
+@dataclass
+class ToolConfig:
+    display_name: str  # shown throughout Search/Predict output
+    model_key: str      # config.csv key for this tool's solvability model pickle
+    data_key: str       # config.csv key for this tool's raw (smiles, is_solved) data
+    url: str            # link to the tool, shown in Predict output
+
+TargetStaticData = "TargetStaticData"
+AizynthfinderStaticData = "AizynthfinderStaticData"
+SynplannerStaticData = "SynplannerStaticData"
+MonitorStaticData = "MonitorStaticData"
+CandidateStaticData = "CandidateStaticData"
+AbstractTrainingData = "AbstractTrainingData"
+AizynthfinderPredictModel = "AizynthfinderPredictModel"
+SynplannerPredictModel = "SynplannerPredictModel"
+PaperPredictModel = "PaperPredictModel"
+
+TOOLS = [
+    ToolConfig(
+        display_name="AiZynthFinder",
+        model_key=AizynthfinderPredictModel,
+        data_key=AizynthfinderStaticData,
+        url="https://github.com/MolecularAI/aizynthfinder",
+    ),
+    ToolConfig(
+        display_name="SynPlanner",
+        model_key=SynplannerPredictModel,
+        data_key=SynplannerStaticData,
+        url="https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner",
+    ),
+]
+
+
 def _load_route_model(path: str):
     """abstract_model.pickle needs nothing beyond plain pickle -- it's
     a TfidfVectorizer + LogisticRegression Pipeline, no custom classes
@@ -33,11 +67,13 @@ class RouteHunterApp:
         property_predictors: Optional[PropertyPredictorSet] = None,
         monitor_high_path: Optional[str] = None,
         route_model=None,
+        tool_links: Optional[dict[str, str]] = None,
     ):
         self.store = store
         self.property_predictors = property_predictors or PropertyPredictorSet()
         self.monitor_high_path = monitor_high_path
         self.route_model = route_model
+        self.tool_links = tool_links or {}
 
     @classmethod
     def from_data_dir(cls, rh_data_dir: str, column_map: Optional[dict] = None) -> "RouteHunterApp":
@@ -45,32 +81,40 @@ class RouteHunterApp:
         Build the app from rh_data_dir/config.csv -- the single
         manifest of every file path this app reads. There is no
         fallback to default paths: if config.csv is missing, this
-        raises rather than guessing. Within config.csv, only seed_csv
-        is required; every other key (casp_table, monitor_high,
-        monitor_medium, AiZynthFinder, SynPlanner, abstract_model) is
-        optional and skipped gracefully if absent -- that resource
-        just won't be available for this session.
+        raises rather than guessing. Within config.csv, only
+        TargetStaticData is required; every other name (see the
+        globals and TOOLS above) is optional and skipped gracefully
+        if absent -- that resource just won't be available for this
+        session.
         """
         paths = load_config(rh_data_dir)  # raises FileNotFoundError if config.csv itself is missing
 
         store = RouteHunterStore()
-        report = _load_csv_seed(store, paths["seed"], column_map)
+        report = _load_csv_seed(store, paths[TargetStaticData], column_map)
 
-        if "casp" in paths:
-            store.set_casp_table(_load_casp_table(paths["casp"]))
+        casp_tool_paths = {
+            tool.display_name: paths[tool.data_key]
+            for tool in TOOLS if tool.data_key in paths
+        }
+        if casp_tool_paths:
+            store.set_casp_table(_load_casp_table(casp_tool_paths))
 
-        if "candidate" in paths:
-            store.set_n_predicted_targets(_count_predicted_targets(paths["candidate"]))
+        if CandidateStaticData in paths:
+            store.set_n_predicted_targets(_count_predicted_targets(paths[CandidateStaticData]))
 
-        predictors = PropertyPredictorSet.load_from_config(paths)
+        predictors = PropertyPredictorSet.load_from_config(
+            paths, [(tool.model_key, tool.display_name) for tool in TOOLS],
+        )
+        tool_links = {tool.display_name: tool.url for tool in TOOLS}
 
-        route_model = _load_route_model(paths["paper"]) if "paper" in paths else None
+        route_model = _load_route_model(paths[PaperPredictModel]) if PaperPredictModel in paths else None
 
         app = cls(
             store,
             property_predictors=predictors,
-            monitor_high_path=paths.get("monitor"),
+            monitor_high_path=paths.get(MonitorStaticData),
             route_model=route_model,
+            tool_links=tool_links,
         )
         app.load_report = report  # kept for inspection, e.g. app.load_report.summary()
         return app
@@ -119,7 +163,7 @@ class RouteHunterApp:
     # here for batch use via the Python interface).
 
     def predict_casp_solvability(self, smiles: str) -> PredictResult:
-        return _predict_casp_solvability(smiles, self.property_predictors.predictors)
+        return _predict_casp_solvability(smiles, self.property_predictors.predictors, self.tool_links)
 
     def predict_route_probability(self, text: str) -> PredictResult:
         return _predict_route_probability(text, self.route_model)

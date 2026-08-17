@@ -1,12 +1,11 @@
 import html
-import os.path
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
 from routehunter import RouteHunterApp
-from routehunter.app import DEFAULT_CSV_SUBPATH
+from routehunter.config import load_config
 from routehunter.core import InvalidSMILESError
 
 
@@ -72,8 +71,11 @@ def load_app(data_dir: str) -> RouteHunterApp:
 @st.cache_data(show_spinner="Loading seed CSV...")
 def load_seed_csv(data_dir: str) -> pd.DataFrame:
     """Raw contents of the seed CSV, unprocessed -- straight pd.read_csv,
-    no pass through RouteHunterStore/Target parsing."""
-    return pd.read_csv(Path(data_dir) / DEFAULT_CSV_SUBPATH)
+    no pass through RouteHunterStore/Target parsing. Path comes from
+    config.csv's "seed" entry -- there's no default path to fall back
+    to anymore."""
+    seed_path = load_config(data_dir)["seed"]
+    return pd.read_csv(seed_path)
 
 
 def caption(text: str, size: str = "1.1rem", color: str = "#000000") -> None:
@@ -217,7 +219,7 @@ def render_search(app: RouteHunterApp) -> None:
             st.info("No papers with route were found for this molecule. You can try CASP tools for prediction:")
 
             try:
-                result = app.predict(smiles)
+                result = app.predict_casp_solvability(smiles)
                 st.dataframe(
                     result.to_dataframe(),
                     use_container_width=True,
@@ -249,7 +251,7 @@ def render_predict(app: RouteHunterApp) -> None:
             st.warning("Enter a SMILES string first.")
             return
         try:
-            result = app.predict(smiles)
+            result = app.predict_casp_solvability(smiles)
         except InvalidSMILESError as e:
             st.error(f"Couldn't parse that SMILES: {e}")
             return
@@ -313,9 +315,8 @@ def render_download(app: RouteHunterApp) -> None:
     # target dataset
     st.subheader("Target collection")
     st.write("Digitalized target collection")
-    file_path = Path(DATA_DIR) / "core/routehunter_seed.csv"
+    file_path = Path(load_config(DATA_DIR)["seed"])
     csv_data = file_path.read_bytes()
-    pdf_data = file_path.read_bytes()
 
     #
     st.subheader("Route report prediction")
@@ -323,10 +324,7 @@ def render_download(app: RouteHunterApp) -> None:
     st.subheader("Targets predicted for digitalization")
 
     col1, col2, _ = st.columns([1, 1, 8])
-    with col1:
-        st.download_button(label="Download CSV", data=csv_data, file_name="target_collection.csv", mime="text/csv")
-    with col2:
-        st.download_button(label="Download PDF", data=pdf_data, file_name="target_collection.pdf", mime="application/pdf")
+    st.download_button(label="Download CSV", data=csv_data, file_name="target_collection.csv", mime="text/csv")
 
 
 def render_contribute(app: RouteHunterApp) -> None:
