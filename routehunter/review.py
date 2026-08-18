@@ -1,5 +1,4 @@
-from .store import TargetStore
-from .candidate import CandidateEngine
+from .store import TargetStore, CandidateStore
 
 USAGE_TEXT = """\
 RouteHunter: A system for the collection and distribution of reference information on chemical synthesis routes
@@ -18,23 +17,23 @@ RouteHunter: A system for the collection and distribution of reference informati
 
 
 class ReviewEngine:
-    def __init__(self, target_store: TargetStore, candidate_engine: CandidateEngine):
+    def __init__(self, target_store: TargetStore, candidate_store: CandidateStore):
         self.target_store = target_store
-        self.candidate_engine = candidate_engine
+        self.candidate_store = candidate_store
 
     def stats(self) -> dict:
-        papers = self.target_store.all_papers()
-        targets = self.target_store.all_targets()
+        targets = self.target_store.targets
+        papers = self.target_store.papers
 
         journal_counts: dict[str, int] = {}
         contributor_counts: dict[str, int] = {}
-        for p in papers:
+        for p in papers.values():
             if p.journal:
-                journal_counts[p.journal] = journal_counts.select(p.journal, 0) + 1
+                journal_counts[p.journal] = journal_counts.get(p.journal, 0) + 1
             contributor = p.contributor or "(unspecified)"
-            contributor_counts[contributor] = contributor_counts.select(contributor, 0) + 1
+            contributor_counts[contributor] = contributor_counts.get(contributor, 0) + 1
 
-        n_multi_paper_targets = sum(1 for t in targets if t.n_papers > 1)
+        n_multi_paper_targets = sum(1 for t in targets.values() if t.n_papers > 1)
         n_cached_casp_routes = 0
 
         return {
@@ -44,7 +43,7 @@ class ReviewEngine:
             "n_cached_casp_routes": n_cached_casp_routes,
             "targets_by_journal": journal_counts,
             "targets_by_contributor": contributor_counts,
-            "n_predicted_candidate_papers": self.candidate_engine.get().count,
+            "n_predicted_candidate_papers": self.candidate_store.n_papers,
         }
 
     def review(self) -> str:

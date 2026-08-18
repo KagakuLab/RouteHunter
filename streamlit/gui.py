@@ -6,7 +6,7 @@ import streamlit as st
 
 from routehunter import RouteHunterApp
 from routehunter.app import TargetStaticData, CandidateStaticData, AbstractTrainingData
-from routehunter.config import load_config
+from routehunter.utils import load_config
 from routehunter.core import InvalidSMILESError
 
 
@@ -72,7 +72,7 @@ def load_app(data_dir: str) -> RouteHunterApp:
 @st.cache_data(show_spinner="Loading seed CSV...")
 def load_seed_csv(data_dir: str) -> pd.DataFrame:
     """Raw contents of the seed CSV, unprocessed -- straight pd.read_csv,
-    no pass through RouteHunterStore/Target parsing. Path comes from
+    no pass through TargetStore/Target parsing. Path comes from
     config.csv's TargetStaticData entry -- there's no default path to
     fall back to anymore."""
     seed_path = load_config(data_dir)[TargetStaticData]
@@ -127,7 +127,7 @@ def render_review(app: RouteHunterApp) -> None:
     st.divider()
 
     # render database stats
-    stats = app.store.stats()
+    stats = app.review_engine.stats()
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Targets", stats["n_targets"])
     c2.metric("Papers", stats["n_papers"])
@@ -205,8 +205,8 @@ def render_search(app: RouteHunterApp) -> None:
             if result.casp_solved:
                 st.dataframe(
                     [
-                        {"Tool": e.tool_display, "Result": f"Solved by {e.tool_display}", "Link": e.link}
-                        for e in result.casp_solved
+                        {"Tool": tool_name, "Result": f"Solved by {tool_name}", "Link": "Cached predicted routes are not available yet"}
+                        for tool_name in result.casp_solved
                     ],
                     use_container_width=True,
                     hide_index=True,
@@ -220,7 +220,7 @@ def render_search(app: RouteHunterApp) -> None:
             st.info("No papers with route were found for this molecule. You can try CASP tools for prediction:")
 
             try:
-                result = app.predict(smiles)
+                result = app.predict_casp_solvability(smiles)
                 st.dataframe(
                     result.to_dataframe(),
                     use_container_width=True,
@@ -252,7 +252,7 @@ def render_predict(app: RouteHunterApp) -> None:
             st.warning("Enter a SMILES string first.")
             return
         try:
-            result = app.predict(smiles)
+            result = app.predict_casp_solvability(smiles)
         except InvalidSMILESError as e:
             st.error(f"Couldn't parse that SMILES: {e}")
             return
@@ -288,13 +288,15 @@ def render_monitor(app: RouteHunterApp) -> None:
             return
 
         result = app.monitor(year_min=int(year_min), year_max=int(year_max))
-        if not result.available:
-            st.info(result.message)
+        if result.empty:
+            st.info("No papers found for that year range.")
             return
 
-        st.write(result.message)
-        monitor_df = result.to_dataframe()
-        monitor_df.index = monitor_df.index + 1
+        st.write(f"{len(result)} paper(s) found, sorted by predicted route probability.")
+        monitor_df = result.copy()
+        monitor_df["route_prob"] = monitor_df["route_prob"].map(lambda p: f"{p:.0%}")
+        monitor_df["publication_date"] = monitor_df["publication_date"].dt.strftime("%d/%m/%Y")
+        monitor_df.index = range(1, len(monitor_df) + 1)
         st.dataframe(
             monitor_df,
             use_container_width=True,

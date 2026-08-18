@@ -1,16 +1,11 @@
 from dataclasses import dataclass, field
 from typing import Optional
-from enum import Enum
 
 from rdkit import Chem
 from rdkit.Chem import inchi as rdkit_inchi
 
 
-class RouteHunterError(Exception):
-    """Base exception for RouteHunter."""
-
-
-class InvalidSMILESError(RouteHunterError):
+class InvalidSMILESError(Exception):
     """Raised when a SMILES string cannot be parsed by RDKit."""
 
 
@@ -39,11 +34,12 @@ def canonicalize(smiles: str) -> Canonicalized:
     if not inchikey:
         raise InvalidSMILESError(f"Could not derive InChIKey for: {smiles!r}")
 
-    return Canonicalized(
+    result = Canonicalized(
         input_smiles=smiles,
         canonical_smiles=canonical_smiles,
         inchikey=inchikey,
     )
+    return result
 
 
 @dataclass
@@ -59,10 +55,6 @@ class Target:
         return len(self.paper_dois)
 
 
-class PaperSource(str, Enum):
-    SEED = "seed"  # loaded from the CSV -- the only source in the static dataset
-
-
 @dataclass
 class PaperRecord:
     """A paper, optionally linked to one or more Targets."""
@@ -72,5 +64,4 @@ class PaperRecord:
     journal: Optional[str] = None
     year: Optional[int] = None
     contributor: Optional[str] = None
-    source: PaperSource = PaperSource.SEED
     target_inchikeys: list[str] = field(default_factory=list)

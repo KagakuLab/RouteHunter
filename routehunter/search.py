@@ -3,7 +3,6 @@ from typing import Optional
 
 from .core import PaperRecord, Target, canonicalize
 from .store import TargetStore, CASPStore, PredictStore
-from .casp import CaspSolvedEntry
 
 
 @dataclass
@@ -12,7 +11,7 @@ class SearchResult:
     target: Target | None
     properties: dict[str, Optional[float]] = field(default_factory=dict)
     papers: list[PaperRecord] = field(default_factory=list)
-    casp_solved: list[CaspSolvedEntry] = field(default_factory=list)
+    casp_solved: list[str] = field(default_factory=list)  # tool names that solved this molecule
 
     def report(self) -> str:
         """
@@ -32,10 +31,10 @@ class SearchResult:
 
         if self.casp_solved:
             lines = [f"Found {len(self.casp_solved)} tool(s) predicted routes for this molecule:"]
-            for e in self.casp_solved:
+            for tool_name in self.casp_solved:
                 lines.append(
-                    f" - [{e.tool_display}] This molecule was solved by {e.tool_display}. "
-                    f"See predicted routes: {e.link}."
+                    f" - [{tool_name}] This molecule was solved by {tool_name}. "
+                    f"See predicted routes: Cached predicted routes are not available yet."
                 )
             sections.append("\n".join(lines))
 
@@ -56,29 +55,32 @@ class SearchEngine:
         self,
         target_store: TargetStore,
         casp_store: CASPStore,
-        predict_store: Optional[PredictStore] = None,
+        predict_store: PredictStore,
     ):
         self.target_store = target_store
         self.casp_store = casp_store
-        self.predict_store = predict_store or PredictStore()
+        self.predict_store = predict_store
 
     def search(self, smiles: str) -> SearchResult:
         canon = canonicalize(smiles)  # raises InvalidSMILESError on bad input
 
-        # Level 1: molecule properties, computed before
-        properties = self.predict_store.predict_all(smiles)
+        # Level 1: molecule properties, computed before -- and independent
+        # of -- whether anything is found in the dataset below. Also
+        # serves as the fallback if level 2 comes up empty.
+        properties = self.predict_store.predict(smiles)
 
         # Level 2: structural lookup against the static dataset.
-        target = self.target_store.get_target(canon.inchikey)
+        target = self.target_store.targets.get(canon.inchikey)
         papers = self.target_store.get_papers_for_target(canon.inchikey) if target else []
-        casp_solved = self.casp_store.solved_entries_for_inchikey(canon.inchikey)
+        casp_solved = self.casp_store.get_tools_for_target(canon.inchikey)
 
         found = bool(papers) or bool(casp_solved)
 
-        return SearchResult(
+        result = SearchResult(
             found=found,
             target=target,
             properties=properties,
             papers=papers,
             casp_solved=casp_solved,
         )
+        return result

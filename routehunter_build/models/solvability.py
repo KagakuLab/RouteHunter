@@ -5,18 +5,8 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 
-from routehunter.featurizers import MorganFingerprintTransformer
+from routehunter.utils import MorganFingerprintTransformer
 from .training import fit_and_evaluate
-
-# MorganFingerprintTransformer is imported from routehunter (the app
-# package), not defined here. A pickled Pipeline containing this class
-# needs it importable wherever the pickle is loaded -- the deployed
-# app always has routehunter installed (by definition), but never
-# routehunter_build (build-only tooling, not a runtime dependency).
-# Defining the class in routehunter_build, even without cloudpickle,
-# would mean every solvability model permanently requires
-# routehunter_build importable at prediction time -- exactly what
-# this avoids.
 
 DEFAULT_PARAM_GRID = {
     "clf__n_estimators": [100, 300, 600],
