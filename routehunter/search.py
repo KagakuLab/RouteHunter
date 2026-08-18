@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
+import pandas as pd
+
 from .core import PaperRecord, Target, canonicalize
 from .store import TargetStore, CASPStore, PredictStore
 
@@ -10,44 +12,10 @@ class SearchResult:
     found: bool
     target: Target | None
     properties: dict[str, Optional[float]] = field(default_factory=dict)
-    papers: list[PaperRecord] = field(default_factory=list)
-    casp_solved: list[str] = field(default_factory=list)  # tool names that solved this molecule
-
-    def report(self) -> str:
-        """
-        Full sectional print-ready report -- this is the one place
-        that owns Search's display formatting, so callers (notebook
-        cells, a future UI) just do `print(result.report())` instead
-        of re-implementing the section logic and label lookups
-        themselves each time.
-        """
-        sections = []
-
-        if self.papers:
-            lines = [f"Found {len(self.papers)} paper(s) reporting a route for this molecule:"]
-            for p in self.papers:
-                lines.append(f" - [paper] {p.title} ({p.journal}, {p.year}) doi:{p.doi}")
-            sections.append("\n".join(lines))
-
-        if self.casp_solved:
-            lines = [f"Found {len(self.casp_solved)} tool(s) predicted routes for this molecule:"]
-            for tool_name in self.casp_solved:
-                lines.append(
-                    f" - [{tool_name}] This molecule was solved by {tool_name}. "
-                    f"See predicted routes: Cached predicted routes are not available yet."
-                )
-            sections.append("\n".join(lines))
-
-        if not self.found:
-            lines = ["This molecule was not found, but you can try CASP tools:"]
-            for name, value in self.properties.items():
-                if value is not None:
-                    lines.append(f" - The chance to be solved by {name}: {value:.0%}")
-                else:
-                    lines.append(f" - The chance to be solved by {name}: n/a")
-            sections.append("\n".join(lines))
-
-        return "\n\n".join(sections)
+    paper_report: pd.DataFrame = field(default_factory=pd.DataFrame)
+    paper_message: str = ""
+    casp_report: pd.DataFrame = field(default_factory=pd.DataFrame)
+    casp_message: str = ""
 
 
 class SearchEngine:
@@ -80,7 +48,44 @@ class SearchEngine:
             found=found,
             target=target,
             properties=properties,
-            papers=papers,
-            casp_solved=casp_solved,
+            paper_report=self._papers_to_dataframe(papers),
+            paper_message=self._paper_message(papers),
+            casp_report=self._casp_to_dataframe(casp_solved),
+            casp_message=self._casp_message(casp_solved),
         )
         return result
+
+    @staticmethod
+    def _papers_to_dataframe(papers: list[PaperRecord]) -> pd.DataFrame:
+        rows = []
+        for p in papers:
+            rows.append({
+                "journal": p.journal,
+                "title": p.title,
+                "year": p.year,
+                "doi": p.doi,
+            })
+        return pd.DataFrame(rows)
+
+    @staticmethod
+    def _paper_message(papers: list[PaperRecord]) -> str:
+        if not papers:
+            return "No papers found reporting a route for this molecule"
+        return f"Found {len(papers)} paper(s) reporting a route for this molecule"
+
+    @staticmethod
+    def _casp_to_dataframe(casp_solved: list[str]) -> pd.DataFrame:
+        rows = []
+        for tool_name in casp_solved:
+            rows.append({
+                "tool": tool_name,
+                "result": f"Solved by {tool_name}",
+                "route": "Cached predicted routes are not available yet",
+            })
+        return pd.DataFrame(rows)
+
+    @staticmethod
+    def _casp_message(casp_solved: list[str]) -> str:
+        if not casp_solved:
+            return "No predictions were obtained by CASP tools for this molecule"
+        return f"Found {len(casp_solved)} tool(s) predicted routes for this molecule"

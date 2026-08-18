@@ -176,7 +176,7 @@ def render_search(app: RouteHunterApp) -> None:
     smiles = smiles_input("search_smiles")
     if st.button("Search", type="primary"):
         if not smiles.strip():
-            st.warning("Enter a SMILES string first.")
+            st.warning("Enter a SMILES string first")
             return
         try:
             result = app.search(smiles)
@@ -186,37 +186,37 @@ def render_search(app: RouteHunterApp) -> None:
 
         # positive search results
         if result.found:
-            if result.papers:
-                st.subheader(f"📄 Found {len(result.papers)} paper(s) with route for this molecule")
+            if not result.paper_report.empty:
+                st.subheader(f"📄 {result.paper_message}")
                 st.dataframe(
-                    [
-                        {
-                            "Journal": p.journal,
-                            "Title": p.title,
-                            "Year": p.year,
-                            "DOI": p.doi,
-                        }
-                        for p in result.papers
-                    ],
+                    result.paper_report,
                     use_container_width=True,
                     hide_index=True,
+                    column_config={
+                        "journal": st.column_config.TextColumn("Journal"),
+                        "title": st.column_config.TextColumn("Title"),
+                        "year": st.column_config.NumberColumn("Year"),
+                        "doi": st.column_config.TextColumn("DOI"),
+                    },
                 )
-            st.subheader(f"💻 Found {len(result.casp_solved)} tool(s) with prediction for this molecule")
-            if result.casp_solved:
+            if not result.casp_report.empty:
+                st.subheader(f"💻 {result.casp_message}")
                 st.dataframe(
-                    [
-                        {"Tool": tool_name, "Result": f"Solved by {tool_name}", "Link": "Cached predicted routes are not available yet"}
-                        for tool_name in result.casp_solved
-                    ],
+                    result.casp_report,
                     use_container_width=True,
                     hide_index=True,
+                    column_config={
+                        "tool": st.column_config.TextColumn("Tool"),
+                        "result": st.column_config.TextColumn("Result"),
+                        "route": st.column_config.TextColumn("Route"),
+                    },
                 )
             else:
-                st.info("No predictions were obtained by CASP tools for this molecule")
+                st.info(result.casp_message)
 
         # negative search result
         if not result.found:
-            st.subheader("📄 Found 0 paper(s) with route for this molecule")
+            st.subheader(f"📄 {result.paper_message}")
             st.info("No papers with route were found for this molecule. You can try CASP tools for prediction:")
 
             try:
@@ -249,7 +249,7 @@ def render_predict(app: RouteHunterApp) -> None:
     smiles = smiles_input("predict_smiles")
     if st.button("Predict", type="primary"):
         if not smiles.strip():
-            st.warning("Enter a SMILES string first.")
+            st.warning("Enter a SMILES string first")
             return
         try:
             result = app.predict_casp_solvability(smiles)
