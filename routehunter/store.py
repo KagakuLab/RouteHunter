@@ -8,7 +8,6 @@ class RouteHunterStore:
     def __init__(self):
         self._targets: dict[str, Target] = {}       # inchikey -> Target
         self._papers: dict[str, PaperRecord] = {}    # doi -> PaperRecord
-        self._casp_routes: dict[str, list[CASPRouteRecord]] = {}  # inchikey -> [CASPRouteRecord], in-memory session cache only
         self._casp_table: dict[str, dict[str, bool]] = {}  # inchikey -> {tool_name: solved_bool}, static, loaded from CSV
         self._n_predicted_candidate_papers: int = 0  # row count of the medium-confidence Monitor file, static, loaded from CSV
 
@@ -68,7 +67,7 @@ class RouteHunterStore:
             contributor_counts[contributor] = contributor_counts.get(contributor, 0) + 1
 
         n_multi_paper_targets = sum(1 for t in targets if t.n_papers > 1)
-        n_cached_casp_routes = sum(len(v) for v in self._casp_routes.values())
+        n_cached_casp_routes = 0 # not implemented yet
 
         return {
             "n_targets": len(targets),

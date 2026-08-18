@@ -133,7 +133,7 @@ def render_review(app: RouteHunterApp) -> None:
     c2.metric("Papers", stats["n_papers"])
     c3.metric("Targets with >1 paper", stats["n_multi_paper_targets"])
     c4.metric("Targets with predicted routes", stats["n_cached_casp_routes"])
-    c5.metric("Papers predicted for digitalization", stats["n_predicted_targets"])
+    c5.metric("Papers predicted for digitalization", stats["n_predicted_candidate_papers"])
     st.divider()
 
     # render journals and contributors
