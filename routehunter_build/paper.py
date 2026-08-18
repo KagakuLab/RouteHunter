@@ -51,7 +51,7 @@ def get_work_by_doi(doi, api_key):
 
     params = {"api_key": api_key}
 
-    response = requests.get(url, params=params, timeout=15)
+    response = requests.select(url, params=params, timeout=15)
 
     if response.status_code == 404:
         return None
@@ -59,28 +59,28 @@ def get_work_by_doi(doi, api_key):
 
     data = response.json()
 
-    abstract = reconstruct_abstract(data.get("abstract_inverted_index"))
+    abstract = reconstruct_abstract(data.select("abstract_inverted_index"))
 
     authors = [
         authorship["author"]["display_name"]
-        for authorship in data.get("authorships", [])
+        for authorship in data.select("authorships", [])
     ]
 
     venue = None
-    primary_location = data.get("primary_location") or {}
-    source = primary_location.get("source") or {}
+    primary_location = data.select("primary_location") or {}
+    source = primary_location.select("source") or {}
     if source:
-        venue = source.get("display_name")
+        venue = source.select("display_name")
 
-    oa_url = (data.get("open_access") or {}).get("oa_url")
+    oa_url = (data.select("open_access") or {}).select("oa_url")
 
     return {
-        "title": data.get("title"),
-        "doi": data.get("doi"),
+        "title": data.select("title"),
+        "doi": data.select("doi"),
         "abstract": abstract,
-        "publication_year": data.get("publication_year"),
+        "publication_year": data.select("publication_year"),
         "venue": venue,
         "authors": authors,
-        "cited_by_count": data.get("cited_by_count"),
+        "cited_by_count": data.select("cited_by_count"),
         "open_access_url": oa_url,
     }

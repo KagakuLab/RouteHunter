@@ -2,8 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from .core import PaperRecord, Target, canonicalize
-from .store import RouteHunterStore
-from .property import PropertyPredictor, compute_properties
+from .store import TargetStore, CASPStore, PredictStore
 from .casp import CaspSolvedEntry
 
 
@@ -52,29 +51,34 @@ class SearchResult:
         return "\n\n".join(sections)
 
 
-def search(
-    store: RouteHunterStore,
-    smiles: str,
-    property_predictors: Optional[list[PropertyPredictor]] = None,
-) -> SearchResult:
-    canon = canonicalize(smiles)  # raises InvalidSMILESError on bad input
+class SearchEngine:
+    def __init__(
+        self,
+        target_store: TargetStore,
+        casp_store: CASPStore,
+        predict_store: Optional[PredictStore] = None,
+    ):
+        self.target_store = target_store
+        self.casp_store = casp_store
+        self.predict_store = predict_store or PredictStore()
 
-    # Level 1: molecule properties, computed before -- and independent
-    # of -- whether anything is found in the dataset below. Also
-    # serves as the fallback if level 2 comes up empty.
-    properties = compute_properties(smiles, property_predictors or [])
+    def search(self, smiles: str) -> SearchResult:
+        canon = canonicalize(smiles)  # raises InvalidSMILESError on bad input
 
-    # Level 2: structural lookup against the static dataset.
-    target = store.get_target(canon.inchikey)
-    papers = store.get_papers_for_target(canon.inchikey) if target else []
-    casp_solved = store.get_casp_solved_entries(canon.inchikey)
+        # Level 1: molecule properties, computed before
+        properties = self.predict_store.predict_all(smiles)
 
-    found = bool(papers) or bool(casp_solved)
+        # Level 2: structural lookup against the static dataset.
+        target = self.target_store.get_target(canon.inchikey)
+        papers = self.target_store.get_papers_for_target(canon.inchikey) if target else []
+        casp_solved = self.casp_store.solved_entries_for_inchikey(canon.inchikey)
 
-    return SearchResult(
-        found=found,
-        target=target,
-        properties=properties,
-        papers=papers,
-        casp_solved=casp_solved,
-    )
+        found = bool(papers) or bool(casp_solved)
+
+        return SearchResult(
+            found=found,
+            target=target,
+            properties=properties,
+            papers=papers,
+            casp_solved=casp_solved,
+        )

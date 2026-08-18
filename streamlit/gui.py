@@ -220,7 +220,7 @@ def render_search(app: RouteHunterApp) -> None:
             st.info("No papers with route were found for this molecule. You can try CASP tools for prediction:")
 
             try:
-                result = app.predict_casp_solvability(smiles)
+                result = app.predict(smiles)
                 st.dataframe(
                     result.to_dataframe(),
                     use_container_width=True,
@@ -252,7 +252,7 @@ def render_predict(app: RouteHunterApp) -> None:
             st.warning("Enter a SMILES string first.")
             return
         try:
-            result = app.predict_casp_solvability(smiles)
+            result = app.predict(smiles)
         except InvalidSMILESError as e:
             st.error(f"Couldn't parse that SMILES: {e}")
             return
