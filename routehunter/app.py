@@ -1,10 +1,10 @@
 import pickle
+import pandas as pd
 from dataclasses import dataclass
 from typing import Optional
-import pandas as pd
 
 from .store import RouteHunterStore
-from .intro import introduction as _introduction
+from .review import review as _introduction
 from .search import search as _search, SearchResult
 from .monitor import load as _load_monitor, MonitorResult, count_predicted_targets as _count_predicted_targets
 from .predict import (
@@ -13,7 +13,7 @@ from .predict import (
     PredictResult,
 )
 from .seed import load_csv_seed as _load_csv_seed, SeedLoadReport
-from .properties import PropertyPredictorSet
+from .property import PropertyPredictorSet
 from .casp import load_casp_table as _load_casp_table
 from .config import load_config
 
@@ -76,18 +76,11 @@ class RouteHunterApp:
         self.tool_links = tool_links or {}
 
     @classmethod
-    def from_data_dir(cls, rh_data_dir: str, column_map: Optional[dict] = None) -> "RouteHunterApp":
-        """
-        Build the app from rh_data_dir/config.csv -- the single
-        manifest of every file path this app reads. There is no
-        fallback to default paths: if config.csv is missing, this
-        raises rather than guessing. Within config.csv, only
-        TargetStaticData is required; every other name (see the
-        globals and TOOLS above) is optional and skipped gracefully
-        if absent -- that resource just won't be available for this
-        session.
-        """
-        paths = load_config(rh_data_dir)  # raises FileNotFoundError if config.csv itself is missing
+    def from_data_dir(cls, init_data_dir: str, column_map: Optional[dict] = None) -> "RouteHunterApp":
+        """Build the app from rh_data_dir/config.csv."""
+
+        # load data location config
+        paths = load_config(init_data_dir)
 
         store = RouteHunterStore()
         report = _load_csv_seed(store, paths[TargetStaticData], column_map)
@@ -119,51 +112,22 @@ class RouteHunterApp:
         app.load_report = report  # kept for inspection, e.g. app.load_report.summary()
         return app
 
-    @classmethod
-    def from_csv(cls, csv_path: str, column_map: Optional[dict] = None) -> "RouteHunterApp":
-        """CSV-only entry point, bypassing config.csv entirely -- no
-        property models, no Monitor data, no route model. Useful for
-        quick testing or if the rest isn't ready yet."""
-        store = RouteHunterStore()
-        report = _load_csv_seed(store, csv_path, column_map)
-        app = cls(store)
-        app.load_report = report
-        return app
-
-    # 1) Introduction --------------------------------------------------
-
-    def introduction(self) -> str:
+    # 1) Review
+    def review(self) -> str:
         return _introduction(self.store)
 
-    # 2) Search ---------------------------------------------------------
-    # Level 1 (properties) runs first, then level 2 (literature/CASP).
-
+    # 2) Search
     def search(self, smiles: str) -> SearchResult:
         return _search(self.store, smiles, self.property_predictors.predictors)
 
-    # 3) Monitor -------------------------------------------------------------
-    # Fully static/read-only: route probabilities were computed offline.
-    # This just reads, optionally filters by year, and sorts the high-
-    # confidence file -- no classifier runs in the app itself.
-
-    def monitor(self, year_min: Optional[int] = None, year_max: Optional[int] = None) -> MonitorResult:
-        """No arguments returns the whole table; year_min/year_max
-        (either or both) filter to papers published in that range."""
-        if self.monitor_high_path is None:
-            return MonitorResult(
-                year_min=year_min, year_max=year_max, available=False, entries=[],
-                message="No monitor file configured for this app.",
-            )
-        return _load_monitor(self.monitor_high_path, year_min=year_min, year_max=year_max)
-
-    # 4) Predict --------------------------------------------------------------
-    # No CASP engine is actually run here. predict_casp_solvability uses
-    # the same per-tool solvability models as Search; predict_route_probability
-    # uses the separate route classifier (not used by the GUI, exposed
-    # here for batch use via the Python interface).
-
+    # 3) Predict
     def predict_casp_solvability(self, smiles: str) -> PredictResult:
         return _predict_casp_solvability(smiles, self.property_predictors.predictors, self.tool_links)
 
     def predict_route_probability(self, text: str) -> PredictResult:
         return _predict_route_probability(text, self.route_model)
+
+    # 4) Monitor
+    def monitor(self, year_min: Optional[int] = None, year_max: Optional[int] = None) -> MonitorResult:
+        return _load_monitor(self.monitor_high_path, year_min=year_min, year_max=year_max)
+

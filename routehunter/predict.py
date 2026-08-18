@@ -3,7 +3,7 @@ from typing import Optional
 
 import pandas as pd
 
-from .properties import PropertyPredictor
+from .property import PropertyPredictor
 
 
 @dataclass

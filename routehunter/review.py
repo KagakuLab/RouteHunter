@@ -2,31 +2,29 @@
 from .store import RouteHunterStore
 
 USAGE_TEXT = """\
-RouteHunter -- synthesis route reference lookup (static dataset)
+RouteHunter: A system for the collection and distribution of reference information on chemical synthesis routes
 
   Search      : give a SMILES, get papers, static CASP-solved tool
                 results, and predicted solvability for that molecule.
+                
+  Predict     : given a SMILES, get predicted solvability probability
+                per CASP tool, with a link to that tool.
+                
   Monitor     : browse recently published papers, ranked by predicted
                 probability of containing a multi-step synthesis route
                 (pre-scored offline; candidates for you to review and
                 add to the CSV by hand).
-  Predict     : given a SMILES, get predicted solvability probability
-                per CASP tool, with a link to that tool.
-  Download    : export the dataset for AI/ML training.
-
-This dataset is loaded from a CSV file; there is no in-app way to
-modify it. To add or correct data, edit the CSV and reload.
 """
 
 
-def introduction(store: RouteHunterStore) -> str:
+def review(store: RouteHunterStore) -> str:
     s = store.stats()
-    lines = [USAGE_TEXT, "", "Current dataset:"]
-    lines.append(f"  Targets                : {s['n_targets']}")
-    lines.append(f"  Papers                 : {s['n_papers']}")
-    lines.append(f"  Targets w/ >1 route    : {s['n_multi_paper_targets']}")
-    lines.append(f"  Cached CASP routes     : {s['n_cached_casp_routes']} (session only)")
-    lines.append(f"  Predicted targets      : {s['n_predicted_targets']} (awaiting digitalization)")
+    lines = [USAGE_TEXT, "", "RouteHunter data review:"]
+    lines.append(f"  Targets                    : {s['n_targets']}")
+    lines.append(f"  Papers                     : {s['n_papers']}")
+    lines.append(f"  Targets with >1 paper      : {s['n_multi_paper_targets']}")
+    lines.append(f"  Cached CASP routes         : {s['n_cached_casp_routes']}")
+    lines.append(f"  Predicted candidate papers : {s['n_predicted_candidate_papers']} (awaiting for digitalization)")
 
     if s["targets_by_journal"]:
         lines.append("  Papers by journal:")

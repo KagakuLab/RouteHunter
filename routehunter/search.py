@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .core import PaperRecord, Target, CASPRouteRecord, canonicalize
+from .core import PaperRecord, Target, canonicalize
 from .store import RouteHunterStore
-from .properties import PropertyPredictor, compute_properties
+from .property import PropertyPredictor, compute_properties
 from .casp import CaspSolvedEntry
 
 
@@ -13,7 +13,6 @@ class SearchResult:
     target: Target | None
     properties: dict[str, Optional[float]] = field(default_factory=dict)
     papers: list[PaperRecord] = field(default_factory=list)
-    casp_routes: list[CASPRouteRecord] = field(default_factory=list)
     casp_solved: list[CaspSolvedEntry] = field(default_factory=list)
 
     def report(self) -> str:
@@ -68,16 +67,14 @@ def search(
     # Level 2: structural lookup against the static dataset.
     target = store.get_target(canon.inchikey)
     papers = store.get_papers_for_target(canon.inchikey) if target else []
-    casp_routes = store.get_casp_routes_for_target(canon.inchikey)
     casp_solved = store.get_casp_solved_entries(canon.inchikey)
 
-    found = bool(papers) or bool(casp_routes) or bool(casp_solved)
+    found = bool(papers) or bool(casp_solved)
 
     return SearchResult(
         found=found,
         target=target,
         properties=properties,
         papers=papers,
-        casp_routes=casp_routes,
         casp_solved=casp_solved,
     )

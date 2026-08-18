@@ -1,6 +1,6 @@
 from typing import Optional
 
-from .core import Target, PaperRecord, CASPRouteRecord
+from .core import Target, PaperRecord
 from .casp import CaspSolvedEntry, solved_entries_for_inchikey
 
 
@@ -10,7 +10,7 @@ class RouteHunterStore:
         self._papers: dict[str, PaperRecord] = {}    # doi -> PaperRecord
         self._casp_routes: dict[str, list[CASPRouteRecord]] = {}  # inchikey -> [CASPRouteRecord], in-memory session cache only
         self._casp_table: dict[str, dict[str, bool]] = {}  # inchikey -> {tool_name: solved_bool}, static, loaded from CSV
-        self._n_predicted_targets: int = 0  # row count of the medium-confidence Monitor file, static, loaded from CSV
+        self._n_predicted_candidate_papers: int = 0  # row count of the medium-confidence Monitor file, static, loaded from CSV
 
     # ---- writes (used only by seed.load_csv_seed) ---------------------
 
@@ -40,14 +40,6 @@ class RouteHunterStore:
     def all_papers(self) -> list[PaperRecord]:
         return list(self._papers.values())
 
-    # ---- session-only CASP cache (runtime engine calls, casp.py) ------
-
-    def add_casp_route(self, record: CASPRouteRecord) -> None:
-        self._casp_routes.setdefault(record.inchikey, []).append(record)
-
-    def get_casp_routes_for_target(self, inchikey: str) -> list[CASPRouteRecord]:
-        return self._casp_routes.get(inchikey, [])
-
     # ---- static CASP solved table (offline, routehunter_casp.csv) -----
 
     def set_casp_table(self, table: dict[str, dict[str, bool]]) -> None:
@@ -59,7 +51,7 @@ class RouteHunterStore:
     # ---- predicted-targets count (offline, paper_route_prob_medium.csv) --
 
     def set_n_predicted_targets(self, n: int) -> None:
-        self._n_predicted_targets = n
+        self._n_predicted_candidate_papers = n
 
     # ---- aggregate stats (feeds the Introduction module) ------------
 
@@ -75,7 +67,7 @@ class RouteHunterStore:
             contributor = p.contributor or "(unspecified)"
             contributor_counts[contributor] = contributor_counts.get(contributor, 0) + 1
 
-        n_multi_paper_targets = sum(1 for t in targets if t.n_routes > 1)
+        n_multi_paper_targets = sum(1 for t in targets if t.n_papers > 1)
         n_cached_casp_routes = sum(len(v) for v in self._casp_routes.values())
 
         return {
@@ -83,7 +75,7 @@ class RouteHunterStore:
             "n_papers": len(papers),
             "n_multi_paper_targets": n_multi_paper_targets,
             "n_cached_casp_routes": n_cached_casp_routes,
-            "n_predicted_targets": self._n_predicted_targets,
             "targets_by_journal": journal_counts,
             "targets_by_contributor": contributor_counts,
+            "n_predicted_candidate_papers": self._n_predicted_candidate_papers,
         }
