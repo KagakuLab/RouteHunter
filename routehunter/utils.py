@@ -2,9 +2,20 @@ import csv
 from pathlib import Path
 
 import numpy as np
+from huggingface_hub import snapshot_download
 from rdkit import Chem, DataStructs
 from rdkit.Chem import rdFingerprintGenerator
 from sklearn.base import BaseEstimator, TransformerMixin
+
+HF_REPO_ID = "KagakuLab/RouteHunterData"
+def download_app_data(to: str = ".", repo_id: str = HF_REPO_ID) -> str:
+    local_dir = snapshot_download(
+        repo_id=repo_id,
+        repo_type="dataset",
+        local_dir=to,
+        allow_patterns=["app_data/*"],
+    )
+    return str(Path(local_dir) / "app_data")
 
 
 def load_config(rh_data_dir: str) -> dict[str, str]:
