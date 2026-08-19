@@ -59,7 +59,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-@st.cache_resource(show_spinner="Loading RouteHunter dataset...")
+@st.cache_resource(show_spinner="Loading RouteHunter ...")
 def load_app(data_dir: str) -> RouteHunterApp:
     """
     Build the RouteHunterApp exactly once per app process, not once
@@ -199,10 +199,10 @@ def render_search(app: RouteHunterApp) -> None:
                         "doi": st.column_config.TextColumn("DOI"),
                     },
                 )
-            if not result.casp_report.empty:
-                st.subheader(f"💻 {result.casp_message}")
+            if not result.tool_report.empty:
+                st.subheader(f"💻 {result.tool_message}")
                 st.dataframe(
-                    result.casp_report,
+                    result.tool_report,
                     use_container_width=True,
                     hide_index=True,
                     column_config={
@@ -212,7 +212,7 @@ def render_search(app: RouteHunterApp) -> None:
                     },
                 )
             else:
-                st.info(result.casp_message)
+                st.info(result.tool_message)
 
         # negative search result
         if not result.found:
@@ -220,7 +220,7 @@ def render_search(app: RouteHunterApp) -> None:
             st.info("No papers with route were found for this molecule. You can try CASP tools for prediction:")
 
             try:
-                result = app.predict_casp_solvability(smiles)
+                result = app.predict(smiles)
                 st.dataframe(
                     result.to_dataframe(),
                     use_container_width=True,
@@ -252,7 +252,7 @@ def render_predict(app: RouteHunterApp) -> None:
             st.warning("Enter a SMILES string first")
             return
         try:
-            result = app.predict_casp_solvability(smiles)
+            result = app.predict(smiles)
         except InvalidSMILESError as e:
             st.error(f"Couldn't parse that SMILES: {e}")
             return
@@ -278,9 +278,9 @@ def render_monitor(app: RouteHunterApp) -> None:
     # search by year range
     col1, col2 = st.columns(2)
     with col1:
-        year_min = st.number_input("From year", min_value=1832, max_value=2100, value=2025, step=1)
+        year_min = st.number_input("From year", min_value=1832, max_value=2026, value=2020, step=1)
     with col2:
-        year_max = st.number_input("To year", min_value=1832, max_value=2100, value=2025, step=1)
+        year_max = st.number_input("To year", min_value=1832, max_value=2026, value=2025, step=1)
 
     if st.button("Predict", type="primary"):
         if year_min > year_max:
@@ -294,6 +294,7 @@ def render_monitor(app: RouteHunterApp) -> None:
 
         st.write(f"{len(result)} paper(s) found, sorted by predicted route probability.")
         monitor_df = result.copy()
+        monitor_df = monitor_df.drop("abstract", axis=1)
         monitor_df["route_prob"] = monitor_df["route_prob"].map(lambda p: f"{p:.0%}")
         monitor_df["publication_date"] = monitor_df["publication_date"].dt.strftime("%d/%m/%Y")
         monitor_df.index = range(1, len(monitor_df) + 1)

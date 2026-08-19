@@ -2,7 +2,7 @@ from typing import Optional
 
 import pandas as pd
 
-from .store import TargetStore, CASPStore, MonitorStore, CandidateStore, PredictStore
+from .store import TargetStore, ToolStore, MonitorStore, CandidateStore, PredictStore
 from .review import ReviewEngine
 from .search import SearchEngine, SearchResult
 from .predict import PredictEngine, PredictResult
@@ -22,32 +22,29 @@ class RouteHunterApp:
     def __init__(
         self,
         target_store: TargetStore,
-        casp_store: CASPStore,
+        tool_store: ToolStore,
         monitor_store: MonitorStore,
         candidate_store: CandidateStore,
         predict_store: PredictStore,
     ):
         self.target_store = target_store
-        self.casp_store = casp_store
+        self.tool_store = tool_store
         self.monitor_store = monitor_store
         self.candidate_store = candidate_store
         self.predict_store = predict_store
 
-        self.search_engine = SearchEngine(target_store, casp_store, predict_store)
         self.predict_engine = PredictEngine(predict_store)
+        self.search_engine = SearchEngine(target_store, tool_store, self.predict_engine)
         self.review_engine = ReviewEngine(target_store, candidate_store)
 
     @classmethod
     def from_data_dir(cls, init_data_dir: str) -> "RouteHunterApp":
-        """Build the app from rh_data_dir/config.csv. Every data file
-        is expected to be present in config.csv already; a missing
-        key or file crashes here rather than degrading silently."""
 
         paths = load_config(init_data_dir)
 
         target_store = TargetStore(paths[TargetStaticData])
 
-        casp_store = CASPStore(
+        tool_store = ToolStore(
             aizynthfinder_data_path=paths[AizynthfinderStaticData],
             synplanner_data_path=paths[SynplannerStaticData],
         )
@@ -62,7 +59,7 @@ class RouteHunterApp:
 
         app = cls(
             target_store,
-            casp_store,
+            tool_store,
             monitor_store,
             candidate_store,
             predict_store,
@@ -78,8 +75,8 @@ class RouteHunterApp:
         return self.search_engine.search(smiles)
 
     # 3) Predict
-    def predict_casp_solvability(self, smiles: str) -> PredictResult:
-        return self.predict_engine.predict_casp_solvability(smiles)
+    def predict(self, smiles: str) -> PredictResult:
+        return self.predict_engine.predict_solvability(smiles)
 
     # 4) Monitor
     def monitor(self, year_min: Optional[int] = None, year_max: Optional[int] = None) -> pd.DataFrame:

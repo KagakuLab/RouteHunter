@@ -1,5 +1,5 @@
-from .core import Target, PaperRecord, canonicalize, InvalidSMILESError
-from .store import TargetStore, CASPStore, MonitorStore, CandidateStore, PredictStore
+from .core import Target, Paper, canonicalize, InvalidSMILESError
+from .store import TargetStore, ToolStore, MonitorStore, CandidateStore, PredictStore
 from .app import RouteHunterApp
 from .search import SearchEngine, SearchResult
 from .predict import PredictEngine, PredictResult
@@ -7,11 +7,11 @@ from .review import ReviewEngine
 
 __all__ = [
     "Target",
-    "PaperRecord",
+    "Paper",
     "canonicalize",
     "InvalidSMILESError",
     "TargetStore",
-    "CASPStore",
+    "ToolStore",
     "MonitorStore",
     "CandidateStore",
     "PredictStore",

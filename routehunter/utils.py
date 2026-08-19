@@ -8,14 +8,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 
 
 def load_config(rh_data_dir: str) -> dict[str, str]:
-    """
-    Reads rh_data_dir/config.csv -- key,path,comment -- and returns
-    {key: resolved_path}, with each path resolved relative to
-    rh_data_dir. This is the only source of truth for file locations;
-    there is no fallback to hardcoded defaults anywhere else in the
-    package. Raises FileNotFoundError if config.csv itself, or a path
-    it lists, doesn't exist.
-    """
+
     base = Path(rh_data_dir)
     config_path = base / "config.csv"
 
@@ -34,10 +27,6 @@ def load_config(rh_data_dir: str) -> dict[str, str]:
 
 
 class MorganFingerprintTransformer(BaseEstimator, TransformerMixin):
-    """
-    sklearn-compatible transformer: list of SMILES in, Morgan (ECFP)
-    fingerprint bit array out.
-    """
 
     def __init__(self, radius: int = 2, n_bits: int = 2048):
         self.radius = radius

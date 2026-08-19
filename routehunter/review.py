@@ -3,16 +3,13 @@ from .store import TargetStore, CandidateStore
 USAGE_TEXT = """\
 RouteHunter: A system for the collection and distribution of reference information on chemical synthesis routes
 
-  Search      : give a SMILES, get papers, static CASP-solved tool
-                results, and predicted solvability for that molecule.
+  Search      : check whether a given target molecule already has a known route
+                either a paper reporting it, or a CASP tool that has already predicted a route for it
                 
-  Predict     : given a SMILES, get predicted solvability probability
-                per CASP tool, with a link to that tool.
+  Predict     : predict the solvability of a molecule - the chance that it can be solved by open-source CASP tools
                 
-  Monitor     : browse recently published papers, ranked by predicted
-                probability of containing a multi-step synthesis route
-                (pre-scored offline; candidates for you to review and
-                add to the CSV by hand).
+  Monitor     : ranks papers by the predicted probability that they describe a multi-step synthesis route,
+                based only on the paper's title and abstract.
 """
 
 

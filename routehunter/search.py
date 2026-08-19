@@ -2,9 +2,9 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import pandas as pd
-
-from .core import PaperRecord, Target, canonicalize
-from .store import TargetStore, CASPStore, PredictStore
+from .core import Paper, Target, canonicalize
+from .store import TargetStore, ToolStore
+from .predict import PredictEngine
 
 
 @dataclass
@@ -14,35 +14,29 @@ class SearchResult:
     properties: dict[str, Optional[float]] = field(default_factory=dict)
     paper_report: pd.DataFrame = field(default_factory=pd.DataFrame)
     paper_message: str = ""
-    casp_report: pd.DataFrame = field(default_factory=pd.DataFrame)
-    casp_message: str = ""
+    tool_report: pd.DataFrame = field(default_factory=pd.DataFrame)
+    tool_message: str = ""
 
 
 class SearchEngine:
     def __init__(
         self,
         target_store: TargetStore,
-        casp_store: CASPStore,
-        predict_store: PredictStore,
+        tool_store: ToolStore,
+        predict_engine: PredictEngine,
     ):
         self.target_store = target_store
-        self.casp_store = casp_store
-        self.predict_store = predict_store
+        self.tool_store = tool_store
+        self.predict_engine = predict_engine
 
     def search(self, smiles: str) -> SearchResult:
-        canon = canonicalize(smiles)  # raises InvalidSMILESError on bad input
-
-        # Level 1: molecule properties, computed before -- and independent
-        # of -- whether anything is found in the dataset below. Also
-        # serves as the fallback if level 2 comes up empty.
-        properties = self.predict_store.predict(smiles)
-
-        # Level 2: structural lookup against the static dataset.
+        canon = canonicalize(smiles)
+        properties = self.predict_engine.predict_solvability(smiles).predictions
         target = self.target_store.targets.get(canon.inchikey)
         papers = self.target_store.get_papers_for_target(canon.inchikey) if target else []
-        casp_solved = self.casp_store.get_tools_for_target(canon.inchikey)
+        tools = self.tool_store.get_tools_for_target(canon.inchikey)
 
-        found = bool(papers) or bool(casp_solved)
+        found = bool(papers) or bool(tools)
 
         result = SearchResult(
             found=found,
@@ -50,13 +44,13 @@ class SearchEngine:
             properties=properties,
             paper_report=self._papers_to_dataframe(papers),
             paper_message=self._paper_message(papers),
-            casp_report=self._casp_to_dataframe(casp_solved),
-            casp_message=self._casp_message(casp_solved),
+            tool_report=self._tools_to_dataframe(tools),
+            tool_message=self._tool_message(tools),
         )
         return result
 
     @staticmethod
-    def _papers_to_dataframe(papers: list[PaperRecord]) -> pd.DataFrame:
+    def _papers_to_dataframe(papers: list[Paper]) -> pd.DataFrame:
         rows = []
         for p in papers:
             rows.append({
@@ -68,15 +62,15 @@ class SearchEngine:
         return pd.DataFrame(rows)
 
     @staticmethod
-    def _paper_message(papers: list[PaperRecord]) -> str:
+    def _paper_message(papers: list[Paper]) -> str:
         if not papers:
             return "No papers found reporting a route for this molecule"
         return f"Found {len(papers)} paper(s) reporting a route for this molecule"
 
     @staticmethod
-    def _casp_to_dataframe(casp_solved: list[str]) -> pd.DataFrame:
+    def _tools_to_dataframe(solved_list: list[str]) -> pd.DataFrame:
         rows = []
-        for tool_name in casp_solved:
+        for tool_name in solved_list:
             rows.append({
                 "tool": tool_name,
                 "result": f"Solved by {tool_name}",
@@ -85,7 +79,7 @@ class SearchEngine:
         return pd.DataFrame(rows)
 
     @staticmethod
-    def _casp_message(casp_solved: list[str]) -> str:
-        if not casp_solved:
+    def _tool_message(solved_list: list[str]) -> str:
+        if not solved_list:
             return "No predictions were obtained by CASP tools for this molecule"
-        return f"Found {len(casp_solved)} tool(s) predicted routes for this molecule"
+        return f"Found {len(solved_list)} tool(s) predicted routes for this molecule"

@@ -6,25 +6,41 @@ from rdkit.Chem import inchi as rdkit_inchi
 
 
 class InvalidSMILESError(Exception):
-    """Raised when a SMILES string cannot be parsed by RDKit."""
+    pass
 
 
 @dataclass(frozen=True)
 class Canonicalized:
-    """Result of canonicalizing a SMILES string."""
     input_smiles: str
     canonical_smiles: str
     inchikey: str
 
 
-def canonicalize(smiles: str) -> Canonicalized:
-    """
-    Single source of truth for "what counts as the same molecule".
+@dataclass
+class Target:
+    inchikey: str
+    canonical_smiles: str
+    input_smiles: str  # first-seen input form, kept for reference/debugging
+    paper_dois: list[str] = field(default_factory=list)
 
-    Every module (Search, seed loading, Hunter) must route through
-    this function before touching the store, so structural identity
-    is defined in exactly one place.
-    """
+    @property
+    def n_papers(self) -> int:
+        return len(self.paper_dois)
+
+
+@dataclass
+class Paper:
+    doi: str
+    title: str
+    abstract: Optional[str] = None
+    journal: Optional[str] = None
+    year: Optional[int] = None
+    contributor: Optional[str] = None
+    target_inchikeys: list[str] = field(default_factory=list)
+
+
+def canonicalize(smiles: str) -> Canonicalized:
+
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         raise InvalidSMILESError(f"Could not parse SMILES: {smiles!r}")
@@ -40,28 +56,3 @@ def canonicalize(smiles: str) -> Canonicalized:
         inchikey=inchikey,
     )
     return result
-
-
-@dataclass
-class Target:
-    """A molecule that RouteHunter tracks synthesis routes for."""
-    inchikey: str
-    canonical_smiles: str
-    input_smiles: str  # first-seen input form, kept for reference/debugging
-    paper_dois: list[str] = field(default_factory=list)
-
-    @property
-    def n_papers(self) -> int:
-        return len(self.paper_dois)
-
-
-@dataclass
-class PaperRecord:
-    """A paper, optionally linked to one or more Targets."""
-    doi: str
-    title: str
-    abstract: Optional[str] = None
-    journal: Optional[str] = None
-    year: Optional[int] = None
-    contributor: Optional[str] = None
-    target_inchikeys: list[str] = field(default_factory=list)

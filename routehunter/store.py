@@ -1,10 +1,10 @@
 import pickle
-from typing import Callable, Optional
+from typing import Optional
 
 import pandas as pd
 from rdkit import Chem
 
-from .core import Target, PaperRecord, canonicalize
+from .core import Target, Paper, canonicalize
 
 AIZYNTHFINDER = "AiZynthFinder"
 SYNPLANNER = "SynPlanner"
@@ -13,10 +13,10 @@ SYNPLANNER = "SynPlanner"
 class TargetStore:
     def __init__(self, data_path: str):
         self.targets: dict[str, Target] = {}
-        self.papers: dict[str, PaperRecord] = {}
+        self.papers: dict[str, Paper] = {}
         self._parse(self._read(data_path))
 
-    def get_papers_for_target(self, inchikey: str) -> list[PaperRecord]:
+    def get_papers_for_target(self, inchikey: str) -> list[Paper]:
         target = self.targets.get(inchikey)
         if target is None:
             return []
@@ -31,9 +31,7 @@ class TargetStore:
         return pd.read_csv(path)
 
     def _parse(self, df: pd.DataFrame) -> None:
-        """Rows already present (same molecule, same DOI) are folded
-        into the existing Target/PaperRecord graph rather than
-        duplicated."""
+
         for _, row in df.iterrows():
             canon = canonicalize(row["target"])
             inchikey = canon.inchikey
@@ -58,7 +56,7 @@ class TargetStore:
                     journal = row.get("journal")
                     year = row.get("year")
                     contributor = row.get("contributor")
-                    paper = PaperRecord(
+                    paper = Paper(
                         doi=doi,
                         title=row["title"],
                         abstract=None if pd.isna(abstract) else abstract,
@@ -76,7 +74,7 @@ class TargetStore:
             self.targets[target.inchikey] = target
 
 
-class CASPStore:
+class ToolStore:
     def __init__(self, aizynthfinder_data_path: str, synplanner_data_path: str):
         self.solved: dict[str, dict[str, bool]] = {
             AIZYNTHFINDER: self._parse(self._read(aizynthfinder_data_path)),
@@ -135,30 +133,13 @@ class CandidateStore:
 
 class PredictStore:
     def __init__(self, aizynthfinder_model_path: str, synplanner_model_path: str):
-        self._predictors: dict[str, Callable[[str], float]] = {
-            AIZYNTHFINDER: self._load_predictor(aizynthfinder_model_path),
-            SYNPLANNER: self._load_predictor(synplanner_model_path),
+        self.models: dict[str, object] = {
+            AIZYNTHFINDER: self._load(aizynthfinder_model_path),
+            SYNPLANNER: self._load(synplanner_model_path),
         }
 
     @staticmethod
-    def _load_predictor(pickle_path: str) -> Callable[[str], float]:
-        """
-        Wrap a pickled sklearn-style model (anything exposing
-        predict_proba) as a smiles -> probability callable. The
-        pickle is expected to be self-contained (see
-        routehunter_build's use of cloudpickle), so loading it here
-        requires nothing beyond the file itself.
-        """
+    def _load(pickle_path: str) -> object:
+
         with open(pickle_path, "rb") as f:
-            model = pickle.load(f)
-
-        def predict(smiles: str) -> float:
-            return float(model.predict_proba([smiles])[0, 1])
-
-        return predict
-
-    def predict(self, smiles: str) -> dict[str, float]:
-        result = {}
-        for tool_name, predictor in self._predictors.items():
-            result[tool_name] = predictor(smiles)
-        return result
+            return pickle.load(f)
