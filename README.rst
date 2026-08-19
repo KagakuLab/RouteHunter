@@ -59,54 +59,13 @@ from it:
 
    print(app.review())
 
-Search for a molecule
-~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   result = app.search("C#CCOC1=C(C=C(C(=C1)N2C(=O)N3CCCCC3=N2)Cl)Cl")
-
-   print(result.found)          # True if a paper or a CASP tool already covers this molecule
-   print(result.paper_message)  # e.g. "Found 1 paper(s) reporting a route for this molecule"
-   print(result.paper_report)   # pandas.DataFrame: journal, title, year, doi
-   print(result.tool_message)   # e.g. "Found 1 tool(s) predicted routes for this molecule"
-   print(result.tool_report)    # pandas.DataFrame: tool, result, route
-
-Predict solvability
-~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   result = app.predict("CC(C)Cc1ccc(cc1)C(C)C(=O)O")
-   print(result.to_dataframe())  # predicted solvability probability per CASP tool, with a link to each tool
-
-Monitor recent papers
-~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   papers = app.monitor(year_min=2023, year_max=2025)
-   print(papers)  # pandas.DataFrame, ranked by predicted probability of reporting a synthesis route
-
-CASP tools currently covered
------------------------------
-
-- `AiZynthFinder <https://github.com/MolecularAI/aizynthfinder>`_
-- `SynPlanner <https://github.com/Laboratoire-de-Chemoinformatique/SynPlanner>`_
-
-Project layout
---------------
-
-.. code-block::
-
-   routehunter/        the published package (pip install routehunter) -- everything above lives here
-   routehunter_build/  internal tooling for building and maintaining the dataset (not published to PyPI)
-   streamlit/          the Streamlit app behind the live demo
+For examples of the Search, Predict, and Monitor services, see
+`RouteHunterApp.ipynb <https://github.com/KagakuLab/RouteHunter/blob/main/RouteHunterApp.ipynb>`_.
 
 Contributing
 ------------
 
-RouteHunter is a static, curated dataset -- there's currently no way to add or edit data files
+RouteHunter is a static, curated dataset - there's currently no way to add or edit data files
 directly. All data is updated manually by an administrator after the submitted data has been
 validated.
 
@@ -119,8 +78,3 @@ Contributions of any kind are welcome:
 
 Send contributions to dvzankov@gmail.com, and please include the name you'd like registered as the
 contributor on your records.
-
-License
--------
-
-MIT -- see `LICENSE <https://github.com/KagakuLab/RouteHunter/blob/main/LICENSE>`_.
