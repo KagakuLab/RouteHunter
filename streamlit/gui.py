@@ -8,10 +8,14 @@ from routehunter import RouteHunterApp
 from routehunter.app import TargetStaticData, CandidateStaticData, AbstractTrainingData
 from routehunter.utils import load_config
 from routehunter.core import InvalidSMILESError
+from routehunter.utils import download_app_data
 
+@st.cache_resource(show_spinner="Downloading RouteHunter data...")
+def get_data_dir(to=".") -> str:
+    return download_app_data(to=to)
 
 # Global settings
-DATA_DIR = "rh_data"
+DATA_DIR = get_data_dir(to="app_data")
 SECTIONS = ["📊 Review", "🔎 Search", "💻 Predict", "📄️ Monitor", "💾 Download", "⬇️ Contribute"]
 
 # Sidebar settings
@@ -59,7 +63,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-@st.cache_resource(show_spinner="Loading RouteHunter ...")
+@st.cache_resource(show_spinner=None)
 def load_app(data_dir: str) -> RouteHunterApp:
     """
     Build the RouteHunterApp exactly once per app process, not once
